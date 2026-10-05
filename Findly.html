@@ -1,0 +1,2764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+<meta name="theme-color" content="#6366f1" />
+<title>Activity Finder</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#f6f7fb; --ink:#0f172a; }
+  *{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
+  html{ width:100%; max-width:100%; overflow-x:hidden; margin:0; padding:0; }
+  body{ width:100%; max-width:100%; overflow-x:clip; margin:0; padding:0;
+    font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); }
+  #root{ width:100%; max-width:100%; overflow-x:clip; }
+  body[dir="rtl"]{ font-family:'Noto Sans Arabic','Inter',sans-serif; }
+  .no-sb::-webkit-scrollbar{display:none}
+  .no-sb{-ms-overflow-style:none;scrollbar-width:none}
+  .grad{background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)}
+  .card-s{box-shadow:0 1px 2px rgba(15,23,42,.04),0 6px 20px -8px rgba(15,23,42,.08)}
+  .card-s-h{box-shadow:0 2px 6px rgba(15,23,42,.05),0 20px 40px -14px rgba(99,102,241,.2)}
+  @keyframes sh{0%{background-position:-400px 0}100%{background-position:400px 0}}
+  .skel{background:linear-gradient(90deg,#eceef2 0%,#f6f7f9 50%,#eceef2 100%);background-size:800px 100%;animation:sh 1.4s infinite linear}
+  @keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .fu{animation:fu .32s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+  .pop{animation:pop .3s ease-out}
+  @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .su{animation:su .28s cubic-bezier(.2,.7,.3,1)}
+  @keyframes fi{from{opacity:0}to{opacity:1}}
+  .fi{animation:fi .2s ease-out}
+  @keyframes si{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+  .si{animation:si .24s cubic-bezier(.2,.7,.3,1)}
+  @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.4}}
+  .live-dot{animation:pulseDot 1.8s ease-in-out infinite}
+  @keyframes pulseRing{0%{transform:scale(.6);opacity:.6}80%,100%{transform:scale(2.2);opacity:0}}
+  .leaflet-container{font-family:inherit;background:#eef1f6}
+  .leaflet-control-attribution{font-size:9px !important;background:rgba(255,255,255,.8) !important}
+  .mpin{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);border:2.5px solid #fff;box-shadow:0 6px 14px rgba(15,23,42,.28)}
+  .mpin>span{transform:rotate(45deg);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:900}
+  .demo-stripe{
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(251,146,60,.14) 0px,
+      rgba(251,146,60,.14) 10px,
+      rgba(251,146,60,.06) 10px,
+      rgba(251,146,60,.06) 20px
+    );
+  }
+  .hscroll{ display:flex; overflow-x:auto; overflow-y:hidden;
+    -webkit-overflow-scrolling:touch; scroll-snap-type:x mandatory;
+    max-width:100%; box-sizing:border-box; }
+  .hscroll > * { scroll-snap-align:start; flex:0 0 auto; }
+  .l2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .l3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .chip-on{background:#6366f1;color:#fff;border-color:#6366f1}
+  .backdrop{background:rgba(15,23,42,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .lang-item:hover{background:#f1f5f9}
+  main, header, section, aside, article, nav { max-width:100%; }
+  .map-wrap, .map-wrap .leaflet-container{ width:100%; max-width:100%; box-sizing:border-box; }
+</style>
+</head>
+<body class="antialiased">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ============= ICONS ============= */
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}/>;
+const Ic = {
+  Search:(p)=><Svg {...p}><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></Svg>,
+  Pin:(p)=><Svg {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Svg>,
+  Sliders:(p)=><Svg {...p}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></Svg>,
+  Bookmark:({filled,...p})=><Svg fill={filled?"currentColor":"none"} {...p}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></Svg>,
+  Check:(p)=><Svg strokeWidth="3" {...p}><polyline points="20 6 9 17 4 12"/></Svg>,
+  Alert:(p)=><Svg {...p}><path d="m10.29 3.86-8.47 14.14A2 2 0 0 0 3.53 21h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Svg>,
+  Clock:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></Svg>,
+  Cal:(p)=><Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></Svg>,
+  Map:(p)=><Svg {...p}><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><line x1="9" y1="4" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="20"/></Svg>,
+  List:(p)=><Svg {...p}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></Svg>,
+  User:(p)=><Svg {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></Svg>,
+  Home:(p)=><Svg {...p}><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><polyline points="9 22 9 13 15 13 15 22"/></Svg>,
+  ChevR:(p)=><Svg strokeWidth="2.4" {...p}><polyline points="9 18 15 12 9 6"/></Svg>,
+  ChevL:(p)=><Svg strokeWidth="2.4" {...p}><polyline points="15 18 9 12 15 6"/></Svg>,
+  ChevD:(p)=><Svg strokeWidth="2.4" {...p}><polyline points="6 9 12 15 18 9"/></Svg>,
+  X:(p)=><Svg strokeWidth="2.4" {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>,
+  Shield:(p)=><Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><polyline points="9 12 11 14 15 10"/></Svg>,
+  Phone:(p)=><Svg {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92Z"/></Svg>,
+  Link:(p)=><Svg {...p}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07L11.75 5.2"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07L12.25 18.8"/></Svg>,
+  Arrow:(p)=><Svg strokeWidth="2.2" {...p}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Svg>,
+  Crosshair:(p)=><Svg {...p}><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2" fill="currentColor"/></Svg>,
+  Refresh:(p)=><Svg {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Svg>,
+  Trend:(p)=><Svg {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></Svg>,
+  Users:(p)=><Svg {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>,
+  Filter:(p)=><Svg {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Svg>,
+  Grid:(p)=><Svg {...p}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></Svg>,
+  Dumbbell:(p)=><Svg {...p}><path d="M14.4 14.4 9.6 9.6"/><path d="M18.66 21.49a2 2 0 1 1-2.83-2.83l-1.77 1.77a2 2 0 1 1-2.83-2.83l6.36-6.36a2 2 0 1 1 2.83 2.83l-1.77 1.76a2 2 0 1 1 2.83 2.83Z"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.4 12.77a2 2 0 1 1-2.83-2.83l1.77-1.77a2 2 0 1 1-2.83-2.83l2.83-2.83a2 2 0 1 1 2.83 2.83l1.77-1.77a2 2 0 1 1 2.83 2.83Z"/></Svg>,
+  Tennis:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><path d="M5.3 5.3c3.5 3.5 3.5 10 0 13.4"/><path d="M18.7 5.3c-3.5 3.5-3.5 10 0 13.4"/></Svg>,
+  Football:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><path d="m12 8 2.6 1.9-1 3.1h-3.2l-1-3.1z"/><path d="m12 8 .1-3M17 12l2.4 1.4M14.9 16.5l1.6 2.8M9.1 16.5l-1.6 2.8M7 12 4.6 13.4"/></Svg>,
+  Basketball:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="M5.5 5.5c3 3 3 10 0 13"/><path d="M18.5 5.5c-3 3-3 10 0 13"/></Svg>,
+  Waves:(p)=><Svg {...p}><path d="M2 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M2 17c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M2 7c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></Svg>,
+  Bike:(p)=><Svg {...p}><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h3l2.5 4-3 6H8l4-8h3"/><circle cx="12" cy="6" r="1.5"/></Svg>,
+  Run:(p)=><Svg {...p}><circle cx="13" cy="4" r="2"/><path d="m4 22 3-6 3 1 1-4 4 3 3-4 3 3"/><path d="m9 15-2 7"/><path d="m15 16 2 6"/></Svg>,
+  Mountain:(p)=><Svg {...p}><path d="m3 20 6-11 4 6 2-3 6 8z"/><path d="m9 9 2-3 4 6"/></Svg>,
+  Swords:(p)=><Svg {...p}><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" y1="14" x2="9" y2="18"/><line x1="7" y1="17" x2="4" y2="20"/><line x1="3" y1="19" x2="5" y2="21"/></Svg>,
+  Chess:(p)=><Svg {...p}><path d="M9 4h6v4h-6z"/><path d="M12 8v4"/><circle cx="12" cy="14" r="3"/><path d="M7 21h10l-1-4H8z"/></Svg>,
+  Gamepad:(p)=><Svg {...p}><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="4"/></Svg>,
+  Book:(p)=><Svg {...p}><path d="M2 4h7a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-7a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h8z"/></Svg>,
+  Code:(p)=><Svg {...p}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></Svg>,
+  Cpu:(p)=><Svg {...p}><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></Svg>,
+  Rocket:(p)=><Svg {...p}><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></Svg>,
+  Wrench:(p)=><Svg {...p}><path d="M14.7 6.3a4 4 0 0 0 5 5l-11 11-4-4z"/><path d="M14.7 6.3 18 3l3 3-3.3 3.3"/></Svg>,
+  Palette:(p)=><Svg {...p}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></Svg>,
+  Music:(p)=><Svg {...p}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></Svg>,
+  Sparkle:(p)=><Svg {...p}><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M18.5 14.5l.8 2.4 2.4.8-2.4.8-.8 2.4-.8-2.4-2.4-.8 2.4-.8z"/></Svg>,
+  HeartHand:(p)=><Svg {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></Svg>,
+  Pulse:(p)=><Svg {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></Svg>,
+  Sun:(p)=><Svg {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></Svg>,
+  Home2:(p)=><Svg {...p}><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></Svg>,
+  Trophy:(p)=><Svg {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M6 4h12v4a6 6 0 0 1-12 0z"/><path d="M8 21h8M12 17v4"/></Svg>,
+  Medal:(p)=><Svg {...p}><circle cx="12" cy="14" r="6"/><path d="M9 9 7 2h10l-2 7"/><path d="m9 14 1.5 1.5L14 12"/></Svg>,
+  Grad:(p)=><Svg {...p}><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></Svg>,
+  Tent:(p)=><Svg {...p}><path d="M3 20 12 4l9 16z"/><path d="M12 20V10"/></Svg>,
+  Tag:(p)=><Svg {...p}><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1" fill="currentColor"/></Svg>,
+  Info:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r=".5" fill="currentColor"/></Svg>,
+  Globe:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/></Svg>,
+  Language:(p)=><Svg {...p}><path d="M4 5h16"/><path d="M12 3v2"/><path d="M6 5c0 8 4 14 12 14"/><path d="M18 5c0 8-4 14-12 14"/></Svg>,
+  Chart:(p)=><Svg {...p}><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></Svg>,
+  Database:(p)=><Svg {...p}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></Svg>,
+  Share:(p)=><Svg {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></Svg>,
+  Navigation:(p)=><Svg {...p}><polygon points="3 11 22 2 13 21 11 13 3 11"/></Svg>,
+  Bell:(p)=><Svg {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></Svg>,
+  Wallet:(p)=><Svg {...p}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></Svg>,
+  Sparkles:(p)=><Svg {...p}><path d="M9 3l1.5 4.5L15 9l-4.5 1.5L9 15l-1.5-4.5L3 9l4.5-1.5L9 3z"/><path d="M18 6l.8 2.4L21.2 9l-2.4.8L18 12l-.8-2.4L14.8 9l2.4-.6L18 6z"/><path d="M17 15l.6 1.8 1.8.6-1.8.6L17 19.8l-.6-1.8-1.8-.6 1.8-.6L17 15z"/></Svg>,
+  Beaker:(p)=><Svg {...p}><path d="M9 2h6M10 2v6.5L4.5 18a3 3 0 0 0 2.6 4.5h9.8a3 3 0 0 0 2.6-4.5L14 8.5V2"/><line x1="8" y1="14" x2="16" y2="14"/></Svg>,
+  Wifi:(p)=><Svg {...p}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></Svg>,
+  WifiOff:(p)=><Svg {...p}><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></Svg>,
+  GoogleMaps:(p)=><Svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></Svg>,
+  Osm:(p)=><Svg {...p}><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/></Svg>,
+  Warning:(p)=><Svg {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Svg>,
+};
+const CAT_ICONS = {
+  All:Ic.Sparkle, Gym:Ic.Dumbbell, Tennis:Ic.Tennis, Football:Ic.Football, Basketball:Ic.Basketball,
+  Swimming:Ic.Waves, Running:Ic.Run, Cycling:Ic.Bike, Hiking:Ic.Mountain, 'Martial Arts':Ic.Swords,
+  Chess:Ic.Chess, Gaming:Ic.Gamepad, Study:Ic.Book, Coding:Ic.Code, Technology:Ic.Cpu,
+  Hackathons:Ic.Rocket, Workshops:Ic.Wrench, Art:Ic.Palette, Music:Ic.Music, Dance:Ic.Music,
+  Volunteering:Ic.HeartHand, Community:Ic.Users, Fitness:Ic.Pulse, Outdoor:Ic.Sun, Indoor:Ic.Home2,
+  Competitions:Ic.Trophy, Tournaments:Ic.Medal, Classes:Ic.Grad, Camps:Ic.Tent, Events:Ic.Cal,
+  Experiences:Ic.Sparkles, Parks:Ic.Mountain, Library:Ic.Book, SportsCentre:Ic.Dumbbell, Other:Ic.Tag,
+};
+
+/* ============= TILE LAYER ============= */
+const TILE_LAYERS = {
+  osm_france: {
+    url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.fr/">OpenStreetMap France</a> | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: 'abc',
+    maxZoom: 20,
+  },
+};
+const DEFAULT_TILES = 'osm_france';
+
+/* ============= CATEGORY → OSM TAGS ============= */
+const CATEGORY_OSM_FILTERS = {
+  'All': [
+    'nwr["leisure"~"^(sports_centre|fitness_centre|swimming_pool|stadium|park|pitch|bowling_alley|escape_game|trampoline_park|amusement_arcade|water_park|miniature_golf|dance|climbing)$"]',
+    'nwr["amenity"~"^(library|community_centre|arts_centre|theatre|cinema|dojo|music_school|dancing_school|language_school)$"]',
+    'nwr["sport"~"^(tennis|soccer|basketball|swimming|martial_arts|athletics|cycling|golf|equestrian|karting|paintball|laser_tag)$"]',
+    'nwr["club"~"^(sport|chess|music|art)$"]',
+    'nwr["tourism"~"^(zoo|aquarium|theme_park)$"]',
+  ],
+  'Tennis':        ['nwr["sport"="tennis"]', 'nwr["leisure"="pitch"]["sport"="tennis"]'],
+  'Football':      ['nwr["sport"~"^(soccer|football|futsal)$"]', 'nwr["leisure"="pitch"]["sport"~"^(soccer|football)$"]'],
+  'Basketball':    ['nwr["sport"="basketball"]', 'nwr["leisure"="pitch"]["sport"="basketball"]'],
+  'Swimming':      ['nwr["sport"="swimming"]', 'nwr["leisure"="swimming_pool"]'],
+  'Gym':           ['nwr["leisure"="fitness_centre"]'],
+  'Fitness':       ['nwr["leisure"~"^(fitness_centre|sports_centre|sports_hall)$"]'],
+  'Running':       ['nwr["sport"="athletics"]', 'nwr["leisure"="track"]'],
+  'Cycling':       ['nwr["sport"="cycling"]'],
+  'Hiking':        ['nwr["sport"="climbing"]', 'nwr["leisure"="climbing"]'],
+  'Martial Arts':  ['nwr["sport"~"^(martial_arts|karate|judo|taekwondo|boxing)$"]', 'nwr["amenity"="dojo"]'],
+  'Chess':         ['nwr["club"="chess"]'],
+  'Gaming':        ['nwr["leisure"="amusement_arcade"]', 'nwr["amenity"="internet_cafe"]'],
+  'Study':         ['nwr["amenity"~"^(library|university|college|school)$"]'],
+  'Coding':        ['nwr["amenity"="coworking_space"]'],
+  'Technology':    ['nwr["amenity"="coworking_space"]'],
+  'Hackathons':    ['nwr["amenity"="coworking_space"]'],
+  'Workshops':     ['nwr["amenity"~"^(community_centre|arts_centre)$"]'],
+  'Art':           ['nwr["amenity"="arts_centre"]', 'nwr["tourism"="museum"]', 'nwr["club"="art"]'],
+  'Music':         ['nwr["amenity"="music_school"]', 'nwr["club"="music"]'],
+  'Dance':         ['nwr["amenity"="dancing_school"]', 'nwr["leisure"="dance"]'],
+  'Volunteering':  ['nwr["amenity"="social_facility"]'],
+  'Community':     ['nwr["amenity"="community_centre"]'],
+  'Outdoor':       ['nwr["leisure"="park"]', 'nwr["tourism"="viewpoint"]'],
+  'Indoor':        ['nwr["leisure"~"^(indoor_play|sports_hall)$"]'],
+  'Competitions':  ['nwr["leisure"="stadium"]'],
+  'Tournaments':   ['nwr["leisure"="stadium"]', 'nwr["leisure"="sports_centre"]'],
+  'Classes':       ['nwr["amenity"~"^(language_school|driving_school|music_school|dancing_school)$"]'],
+  'Camps':         ['nwr["tourism"="camp_site"]'],
+  'Events':        ['nwr["amenity"~"^(theatre|cinema|conference_centre)$"]'],
+  'Experiences':   [
+    'nwr["leisure"="escape_game"]',
+    'nwr["leisure"="bowling_alley"]',
+    'nwr["leisure"="trampoline_park"]',
+    'nwr["leisure"="amusement_arcade"]',
+    'nwr["leisure"="water_park"]',
+    'nwr["leisure"="miniature_golf"]',
+    'nwr["sport"~"^(karting|paintball|laser_tag)$"]',
+    'nwr["tourism"~"^(zoo|aquarium|theme_park)$"]',
+  ],
+  'Other':         ['nwr["leisure"]["name"]', 'nwr["amenity"]["name"]'],
+  'Parks':         ['nwr["leisure"="park"]', 'nwr["leisure"="garden"]'],
+  'Library':       ['nwr["amenity"="library"]'],
+  'SportsCentre':  ['nwr["leisure"="sports_centre"]'],
+};
+
+/* ============= DEMO DATA ============= */
+const DEMO_ACTIVITIES = [
+  { id:'demo-tennis-seeb-1', name:'Seeb Tennis Club — Junior Program', category:'Tennis',
+    subcategory:'Junior training', offers:['Tennis','Coaching'],
+    lat:23.6720, lng:58.1920, address:'Seeb Sports Complex',
+    opening_hours:'Mo-Fr 16:00-20:00; Sa 09:00-13:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample junior tennis program at Seeb Sports Complex. Ages 8–18.',
+    verification:'official', score:80, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Seeb',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Seeb Tennis Club' },
+  { id:'demo-football-seeb-1', name:'Seeb Beach Football — Open Play', category:'Football',
+    subcategory:'Open play', offers:['Football'],
+    lat:23.6690, lng:58.1810, address:'Seeb beach',
+    opening_hours:'Fr 16:00-18:00',
+    phone:null, website:null,
+    description:'Sample beach football session on the Seeb corniche.',
+    verification:'needs_confirm', score:50, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Seeb',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Seeb Beach Community' },
+  { id:'demo-football-1', name:'Al Khoudh Football Academy', category:'Football',
+    subcategory:'Youth academy', offers:['Football','Coaching'],
+    lat:23.5972, lng:58.1535, address:'Al Khoudh area',
+    opening_hours:'Sa-Th 17:00-21:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample youth football academy in Al Khoudh.',
+    verification:'official', score:75, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Khoudh',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Khoudh FC' },
+  { id:'demo-football-2', name:'Friday Night Football — Al Mawaleh', category:'Football',
+    subcategory:'Drop-in', offers:['Football'],
+    lat:23.6152, lng:58.2216, address:'Al Mawaleh pitches',
+    opening_hours:'Fr 20:00-22:00',
+    phone:null, website:null,
+    description:'Sample weekly 5-a-side football session.',
+    verification:'needs_confirm', score:50, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Mawaleh',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Mawaleh Community' },
+  { id:'demo-swim-mawaleh', name:'Al Mawaleh Aquatics Centre — Adult Lessons', category:'Swimming',
+    subcategory:'Adult lessons', offers:['Swimming','Coaching'],
+    lat:23.6145, lng:58.2235, address:'Al Mawaleh area',
+    opening_hours:'Sa-We 06:30-08:00; Th 18:00-19:30',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample adult swimming lessons.',
+    verification:'official', score:85, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Mawaleh',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Mawaleh Aquatics' },
+  { id:'demo-basketball-1', name:'Al Hail Basketball Court — Open Play', category:'Basketball',
+    subcategory:'Open play', offers:['Basketball'],
+    lat:23.6426, lng:58.1962, address:'Al Hail area',
+    opening_hours:'Mo-Su 17:00-22:00',
+    phone:null, website:null,
+    description:'Sample open play basketball court in Al Hail.',
+    verification:'needs_confirm', score:58, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Hail',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Hail Community' },
+  { id:'demo-music-1', name:'Al Hail Music Academy — Oud & Guitar', category:'Music',
+    subcategory:'Music lessons', offers:['Oud','Guitar','Music'],
+    lat:23.6402, lng:58.1925, address:'Al Hail area',
+    opening_hours:'Mo-Su 15:00-21:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample one-on-one oud and guitar lessons.',
+    verification:'official', score:74, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Hail',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Hail Music' },
+  { id:'demo-yoga-1', name:'Azaiba Rooftop Yoga', category:'Fitness',
+    subcategory:'Yoga', offers:['Yoga','Wellness'],
+    lat:23.6013, lng:58.1982, address:'Al Azaiba area',
+    opening_hours:'Su,Tu,Th 06:00-07:00; Sa 07:00-08:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample sunrise rooftop yoga in Al Azaiba.',
+    verification:'official', score:78, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Azaiba',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Azaiba Wellness' },
+  { id:'demo-dance-1', name:'Contemporary Dance — Al Azaiba Studio', category:'Dance',
+    subcategory:'Dance class', offers:['Dance','Contemporary'],
+    lat:23.6020, lng:58.1990, address:'Al Azaiba area',
+    opening_hours:'Mo,We 19:00-20:30',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample contemporary dance class.',
+    verification:'official', score:74, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Azaiba',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Azaiba Dance Studio' },
+  { id:'demo-run-1', name:'Al Ghubrah Friday Run Club', category:'Running',
+    subcategory:'Social run', offers:['Running','Social'],
+    lat:23.5859, lng:58.1775, address:'Al Ghubrah corniche',
+    opening_hours:'Fr 06:00-07:30',
+    phone:null, website:null,
+    description:'Sample weekly 5K and 10K social run.',
+    verification:'official', score:76, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Ghubrah',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Ghubrah Run Club' },
+  { id:'demo-gym-1', name:'Al Khuwair Strength & Conditioning', category:'Gym',
+    subcategory:'Gym', offers:['Gym','Coaching','Strength training'],
+    lat:23.5885, lng:58.2101, address:'Al Khuwair area',
+    opening_hours:'Mo-Su 06:00-23:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample 24/7 access gym in Al Khuwair.',
+    verification:'official', score:82, checks:['Location confirmed','Sample hours listed','Phone listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Khuwair',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Khuwair Strength' },
+  { id:'demo-library-1', name:'Al Khuwair Public Library', category:'Library',
+    subcategory:'Library', offers:['Reading','Study spaces','Community events'],
+    lat:23.5880, lng:58.2110, address:'Al Khuwair area',
+    opening_hours:'Sa-Th 09:00-20:00; Fr 14:00-20:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample public library in Al Khuwair.',
+    verification:'official', score:76, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Khuwair',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Public Library' },
+  { id:'demo-art-1', name:'Al Khuwair Art Studio — Watercolour', category:'Art',
+    subcategory:'Art class', offers:['Watercolour','Art'],
+    lat:23.5900, lng:58.2145, address:'Al Khuwair area',
+    opening_hours:'Sa 10:00-13:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample weekend watercolour workshop for adults.',
+    verification:'official', score:72, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Khuwair',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Al Khuwair Art Studio' },
+  { id:'demo-escape-1', name:'Muscat Escape Room — The Lost Caravan', category:'Experiences',
+    subcategory:'Escape room', offers:['Escape room','Group activity'],
+    lat:23.5950, lng:58.2050, address:'Al Khuwair area',
+    opening_hours:'Mo-Su 14:00-23:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample 60-minute escape room experience.',
+    verification:'official', score:80, checks:['Location confirmed','Sample hours listed','Phone listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Al%20Khuwair',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Muscat Escape' },
+  { id:'demo-tennis-qurum-1', name:'Qurum Tennis Courts — Adult Beginners', category:'Tennis',
+    subcategory:'Adult lessons', offers:['Tennis'],
+    lat:23.6101, lng:58.2270, address:'Qurum Park area',
+    opening_hours:'Tu,Th 18:00-20:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample adult beginner tennis class near Qurum Park.',
+    verification:'needs_confirm', score:55, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Qurum',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Qurum Tennis' },
+  { id:'demo-chess-1', name:'Qurum Library Chess Club', category:'Chess',
+    subcategory:'Chess club', offers:['Chess'],
+    lat:23.6095, lng:58.2250, address:'Qurum area',
+    opening_hours:'We,Sa 17:00-20:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample weekly chess club meeting at Qurum.',
+    verification:'official', score:72, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Qurum',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Qurum Chess Club' },
+  { id:'demo-bowling-1', name:'Qurum Bowling Centre', category:'Experiences',
+    subcategory:'Bowling', offers:['Bowling','Group activity'],
+    lat:23.6110, lng:58.2290, address:'Qurum area',
+    opening_hours:'Mo-Su 12:00-24:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample 12-lane bowling centre near Qurum.',
+    verification:'official', score:76, checks:['Location confirmed','Sample hours listed','Phone listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Qurum',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Qurum Bowling' },
+  { id:'demo-park-1', name:'Qurum Natural Park — Family Area', category:'Parks',
+    subcategory:'Park', offers:['Walking','Playground','Family outing'],
+    lat:23.6100, lng:58.2260, address:'Qurum area',
+    opening_hours:'Mo-Su 06:00-22:00',
+    phone:null, website:null,
+    description:'Sample public park near Qurum.',
+    verification:'official', score:70, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Qurum',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Municipality' },
+  { id:'demo-muttrah-1', name:'Muttrah Corniche Walking Group', category:'Outdoor',
+    subcategory:'Walking', offers:['Walking','Social'],
+    lat:23.6167, lng:58.2550, address:'Muttrah Corniche',
+    opening_hours:'Sa-Th 06:00-08:00',
+    phone:null, website:null,
+    description:'Sample morning walk along the Muttrah Corniche.',
+    verification:'official', score:70, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Muttrah',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Muttrah Walkers' },
+  { id:'demo-muttrah-2', name:'Muttrah Souq Photowalk', category:'Art',
+    subcategory:'Photography', offers:['Photography','Walking'],
+    lat:23.6180, lng:58.2570, address:'Muttrah Souq',
+    opening_hours:'Fr 16:00-18:00',
+    phone:null, website:null,
+    description:'Sample guided photowalk through Muttrah Souq.',
+    verification:'needs_confirm', score:55, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Muttrah',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Muttrah Photowalks' },
+  { id:'demo-msq-1', name:'Madinat Sultan Qaboos Family Park', category:'Parks',
+    subcategory:'Park', offers:['Walking','Playground','Family outing'],
+    lat:23.6010, lng:58.2266, address:'Madinat Al Sultan Qaboos',
+    opening_hours:'Mo-Su 06:00-22:00',
+    phone:null, website:null,
+    description:'Sample family park in Madinat Al Sultan Qaboos.',
+    verification:'official', score:70, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Madinat%20Al%20Sultan%20Qaboos',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Municipality' },
+  { id:'demo-msq-2', name:'MSQ Community Fitness Class', category:'Fitness',
+    subcategory:'Group fitness', offers:['Fitness','Group class'],
+    lat:23.6015, lng:58.2275, address:'Madinat Al Sultan Qaboos',
+    opening_hours:'Su,Tu,Th 18:00-19:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample community fitness class in MSQ.',
+    verification:'official', score:74, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Madinat%20Al%20Sultan%20Qaboos',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'MSQ Community' },
+  { id:'demo-ruwi-1', name:'Ruwi Sports Club — Open Courts', category:'SportsCentre',
+    subcategory:'Sports centre', offers:['Tennis','Basketball','Football'],
+    lat:23.5908, lng:58.2323, address:'Ruwi area',
+    opening_hours:'Mo-Su 06:00-22:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample multi-court sports club in Ruwi.',
+    verification:'official', score:76, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Ruwi',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Ruwi Sports' },
+  { id:'demo-martial-1', name:'Bawshar Karate Dojo', category:'Martial Arts',
+    subcategory:'Karate', offers:['Karate','Martial arts'],
+    lat:23.5828, lng:58.1894, address:'Bawshar area',
+    opening_hours:'Sa,Mo,We 17:30-19:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample traditional karate dojo in Bawshar.',
+    verification:'official', score:74, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Bawshar',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Bawshar Karate' },
+  { id:'demo-salalah-1', name:'Salalah Beach Walk & Cleanup', category:'Volunteering',
+    subcategory:'Beach cleanup', offers:['Volunteering','Walking'],
+    lat:17.0155, lng:54.0930, address:'Salalah beachfront',
+    opening_hours:'Fr 07:00-09:00',
+    phone:null, website:null,
+    description:'Sample monthly beach cleanup and walk.',
+    verification:'needs_confirm', score:55, checks:['Location confirmed'],
+    source_url:'https://www.openstreetmap.org/search?query=Salalah',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Salalah Volunteers' },
+  { id:'demo-sohar-1', name:'Sohar Sports Complex — Multi-Sport', category:'SportsCentre',
+    subcategory:'Sports centre', offers:['Football','Basketball','Swimming','Gym'],
+    lat:24.3473, lng:56.7092, address:'Sohar area',
+    opening_hours:'Mo-Su 06:00-23:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample multi-sport complex in Sohar.',
+    verification:'official', score:78, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Sohar',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Sohar Sports' },
+  { id:'demo-nizwa-1', name:'Nizwa Fort Area — Walking Tour', category:'Outdoor',
+    subcategory:'Walking tour', offers:['Walking','History'],
+    lat:22.9333, lng:57.5333, address:'Nizwa area',
+    opening_hours:'Sa-Th 08:00-18:00',
+    phone:null, website:null,
+    description:'Sample self-guided walking tour around Nizwa Fort.',
+    verification:'official', score:68, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Nizwa',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Nizwa Tourism' },
+  { id:'demo-sur-1', name:'Sur — Kayaking & Turtle Watching', category:'Outdoor',
+    subcategory:'Water activity', offers:['Kayaking','Wildlife'],
+    lat:22.5667, lng:59.5289, address:'Sur area',
+    opening_hours:'Sa-We 16:00-19:00',
+    phone:'+968 2xxx xxxx', website:null,
+    description:'Sample evening kayaking and Ras Al Jinz turtle watching.',
+    verification:'official', score:74, checks:['Location confirmed','Sample hours listed'],
+    source_url:'https://www.openstreetmap.org/search?query=Sur',
+    source_name:'Demo', source_type:'demo',
+    last_checked:new Date().toISOString(), distance_km:0, is_demo:true,
+    organizer:'Sur Adventures' },
+];
+
+/* ============= AREA LOOKUP (Voronoi nearest-neighbour) ============= */
+const OMAN_AREA_CENTRES = [
+  { name:'Seeb',        lat:23.6703, lng:58.1894 },
+  { name:'Al Mawaleh',  lat:23.6152, lng:58.2214 },
+  { name:'Al Khoudh',   lat:23.5980, lng:58.1530 },
+  { name:'Al Hail',     lat:23.6426, lng:58.1962 },
+  { name:'Al Azaiba',   lat:23.6013, lng:58.1982 },
+  { name:'Al Ghubrah',  lat:23.5859, lng:58.1775 },
+  { name:'Al Khuwair',  lat:23.5885, lng:58.2101 },
+  { name:'Qurum',       lat:23.6099, lng:58.2266 },
+  { name:'Bawshar',     lat:23.5828, lng:58.1894 },
+  { name:'MSQ',         lat:23.6010, lng:58.2266 },
+  { name:'Ruwi',        lat:23.5908, lng:58.2323 },
+  { name:'Muttrah',     lat:23.6167, lng:58.2550 },
+  { name:'Salalah',     lat:17.0151, lng:54.0924 },
+  { name:'Sohar',       lat:24.3473, lng:56.7092 },
+  { name:'Nizwa',       lat:22.9333, lng:57.5333 },
+  { name:'Sur',         lat:22.5667, lng:59.5289 },
+];
+function areaFromCoords(lat, lng, fallback){
+  let best = null;
+  let bestDist = Infinity;
+  for (const a of OMAN_AREA_CENTRES){
+    const d = haversine(lat, lng, a.lat, a.lng);
+    if (d < bestDist){
+      best = a.name;
+      bestDist = d;
+    }
+  }
+  if (bestDist > 150) return fallback || 'Oman';
+  return best;
+}
+
+/* ============= LANGUAGES ============= */
+const LANGS = [
+  { code:'en', name:'English', native:'English', dir:'ltr' },
+  { code:'ar', name:'Arabic', native:'العربية', dir:'rtl' },
+];
+const LANG_MAP = Object.fromEntries(LANGS.map(l=>[l.code, l]));
+
+/* ============= STRINGS ============= */
+const STR = {
+en: {
+  appName:'Activity Finder', tagline:'Find something to do, near you.',
+  search_ph:'What do you want to do?', search:'Search',
+  details:'Details', save:'Save', saveAria:'Save',
+  home:'Home', map:'Map', saved:'Saved', profile:'Profile',
+  filters:'Filters', allFilters:'All filters', clearAll:'Clear all', applyFilters:'Apply filters',
+  distance:'Distance', status:'Status', openNow:'Open now', hasContact:'Has contact details',
+  nearby:'Nearby',
+  resultsFor:'Results for', venuesNear:'Things you can do near you',
+  venuesFound:'{n} activities found', venuesFoundSing:'1 activity found',
+  demoMode:'Demo mode — sample activities',
+  liveOn:'Live data',
+  tryLive:'Try live data',
+  backToDemo:'Back to demo',
+  scanningMsg:'Querying OpenStreetMap…',
+  retryingMsg:'Server busy — trying another mirror…',
+  noResults:'No activities found', noResultsRadius:'No activities in this radius',
+  noResultsDesc:'Try removing a filter or searching a broader area.',
+  noResultsRadiusDesc:'Try increasing your distance to see activities around you.',
+  broaden:'Broaden radius', clearFilters:'Clear filters',
+  sort:'Sort', sortNearest:'Nearest', sortScore:'Best data quality', sortAlpha:'A → Z',
+  about:'About', sourceVerification:'Source & verification', contact:'Contact', location:'Location',
+  whenYouCanGo:'When you can go',
+  venueHoursNote:'These are the venue\'s opening hours. Contact the venue directly for class times and schedules.',
+  offersTitle:'What you can do here',
+  website:'Website', phone:'Phone', email:'Email',
+  openWebsite:'Open website', call:'Call', sendEmail:'Send email', directions:'Get directions',
+  openInGoogleMaps:'Google Maps', openInOsm:'OpenStreetMap',
+  notListedInSource:'Not specified in source', hoursNotListed:'Hours not listed',
+  openNowShort:'Open now',
+  verified:'Verified source', official:'Official details', limited:'Limited data',
+  demoSource:'Sample data',
+  fetched:'Fetched',
+  noSaved:'Nothing saved yet', noSavedDesc:'Tap the bookmark icon on any activity to save it here.',
+  savedCount:'Saved',
+  yourProfile:'Your profile', noAccount:'No account. Everything stays on this device.',
+  myLocation:'My location', viewed:'Viewed',
+  preferences:'Preferences', defaultRadius:'Default radius',
+  settings:'Settings', language:'Language', privacy:'Privacy', privacySub:'Data never leaves your device',
+  notifications:'Notifications', notificationsSub:'Coming soon',
+  dashboard:'Demo dashboard', dashboardSub:'Overview of the sample dataset.',
+  totalVenues:'Total activities', demoCount:'Sample activities',
+  categoryCoverage:'Category coverage',
+  noDataYet:'No data yet.',
+  retry:'Retry', discoveryUnavailable:'Live service unavailable',
+  discoveryFailedMsg:'OpenStreetMap mirrors are busy. Staying on demo data.',
+  operatedBy:'Operated by',
+  sourceIsCommunity:'Sample activity created to demonstrate the app. Not a real listing.',
+  neverBooks:'Opens your maps app in a new tab. Activity Finder never books on your behalf.',
+  allCategories:'All categories', tapCategory:'Categories are shown with counts.',
+  more:'More', all:'All',
+  changeLocation:'Change location', changeLocationSub:'Search any city or neighborhood worldwide.',
+  useMyLoc:'Use my current location', useMyLocSub:'GPS + reverse geocoding',
+  orSearchPlace:'Or search any place', presets:'Muscat presets', searchResults:'Search results',
+  geoDenied:'Location permission denied. Please pick a location below.',
+  geoFail:'Could not get your location.',
+  geoUnsupported:'Geolocation is not supported by your browser.',
+  pickLocationTitle:'Where are you?',
+  pickLocationSub:'We could not detect your location automatically. Please pick one so distances are accurate.',
+  searchFail:'Search failed. Try again or use a preset.',
+  noMatches:'No matches found.',
+  where:'Where', hoursLabel:'Hours',
+  filterTipsTitle:'Tips',
+  filterTips:'Sample activities are shown. Click "Try live data" to fetch real venues from OpenStreetMap.',
+  selectLanguage:'Select language', searchLanguages:'Search languages',
+  viewOnOsm:'View on OpenStreetMap',
+  youAreHere:'You are here', approximateArea:'Approximate area',
+  viewDetailsBtn:'View details',
+  sourceLine:'OpenStreetMap · {ago}',
+  sourceLineDemo:'Sample data',
+  check_location:'Location confirmed (OpenStreetMap)',
+  check_website:'Website available', check_phone:'Phone available', check_hours:'Opening hours listed',
+  check_email:'Email available', check_operator:'Operator listed',
+  kindVenue:'Activity', mapTilesFailed:'Map tiles could not be loaded',
+  results:'activities',
+  locating:'Locating you…',
+  locationFound:'Location found',
+  geoWarnTitle:'Your location looks approximate',
+  geoWarnBody:'Your browser reported you at {lat}, {lng} — about {dist} km from {nearest}. Distances below may not be accurate.',
+  geoWarnFix:'Fix location',
+  searchRadius:'Search radius',
+},
+ar: {
+  appName:'مكتشف الأنشطة', tagline:'ابحث عن شيء تفعله بالقرب منك.',
+  search_ph:'ماذا تريد أن تفعل؟', search:'بحث',
+  details:'التفاصيل', save:'حفظ', saveAria:'حفظ',
+  home:'الرئيسية', map:'الخريطة', saved:'المحفوظة', profile:'الحساب',
+  filters:'الفلاتر', allFilters:'كل الفلاتر', clearAll:'مسح الكل', applyFilters:'تطبيق الفلاتر',
+  distance:'المسافة', status:'الحالة', openNow:'مفتوح الآن', hasContact:'مع وسيلة اتصال',
+  nearby:'قريب',
+  resultsFor:'نتائج البحث عن', venuesNear:'أشياء يمكنك فعلها بالقرب منك',
+  venuesFound:'تم إيجاد {n} نشاط', venuesFoundSing:'تم إيجاد نشاط واحد',
+  demoMode:'وضع تجريبي — أنشطة تجريبية',
+  liveOn:'بيانات مباشرة',
+  tryLive:'تجربة البيانات المباشرة',
+  backToDemo:'العودة للتجريبي',
+  scanningMsg:'جاري استعلام OpenStreetMap…',
+  retryingMsg:'الخادم مشغول — جاري تجربة خادم آخر…',
+  noResults:'لا توجد أنشطة', noResultsRadius:'لا أنشطة في هذا النطاق',
+  noResultsDesc:'حاول إزالة فلتر أو توسيع نطاق البحث.',
+  noResultsRadiusDesc:'حاول زيادة المسافة لرؤية أنشطة حولك.',
+  broaden:'توسيع النطاق', clearFilters:'مسح الفلاتر',
+  sort:'ترتيب', sortNearest:'الأقرب', sortScore:'الأفضل بيانات', sortAlpha:'أ → ي',
+  about:'نبذة', sourceVerification:'المصدر والتحقق', contact:'تواصل', location:'الموقع',
+  whenYouCanGo:'متى يمكنك الذهاب',
+  venueHoursNote:'هذه أوقات عمل المكان. اتصل بالمكان مباشرةً لمعرفة أوقات الحصص والجداول.',
+  offersTitle:'ما يمكنك فعله هنا',
+  website:'الموقع', phone:'الهاتف', email:'البريد',
+  openWebsite:'فتح الموقع', call:'اتصال', sendEmail:'إرسال بريد', directions:'الاتجاهات',
+  openInGoogleMaps:'خرائط جوجل', openInOsm:'OpenStreetMap',
+  notListedInSource:'غير محدد في المصدر', hoursNotListed:'أوقات العمل غير مدرجة',
+  openNowShort:'مفتوح الآن',
+  verified:'مصدر موثق', official:'تفاصيل رسمية', limited:'بيانات محدودة',
+  demoSource:'بيانات تجريبية',
+  fetched:'تم الجلب',
+  noSaved:'لا أنشطة محفوظة بعد', noSavedDesc:'اضغط أيقونة الحفظ على أي نشاط لحفظه هنا.',
+  savedCount:'محفوظة',
+  yourProfile:'حسابك', noAccount:'بدون حساب. كل شيء يبقى على هذا الجهاز.',
+  myLocation:'موقعي', viewed:'شوهدت',
+  preferences:'التفضيلات', defaultRadius:'النطاق الافتراضي',
+  settings:'الإعدادات', language:'اللغة', privacy:'الخصوصية', privacySub:'البيانات لا تغادر جهازك',
+  notifications:'الإشعارات', notificationsSub:'قريباً',
+  dashboard:'لوحة تجريبية', dashboardSub:'نظرة عامة على البيانات التجريبية.',
+  totalVenues:'إجمالي الأنشطة', demoCount:'أنشطة تجريبية',
+  categoryCoverage:'تغطية الفئات',
+  noDataYet:'لا بيانات بعد.',
+  retry:'إعادة المحاولة', discoveryUnavailable:'الخدمة المباشرة غير متاحة',
+  discoveryFailedMsg:'خوادم OpenStreetMap مشغولة. البقاء على البيانات التجريبية.',
+  operatedBy:'يديره',
+  sourceIsCommunity:'نشاط تجريبي لاستعراض التطبيق. ليس إعلاناً حقيقياً.',
+  neverBooks:'يفتح تطبيق الخرائط في تبويب جديد. مكتشف الأنشطة لا يحجز نيابة عنك.',
+  allCategories:'كل الفئات', tapCategory:'الفئات تظهر مع العدد.',
+  more:'المزيد', all:'الكل',
+  changeLocation:'تغيير الموقع', changeLocationSub:'ابحث عن أي مدينة أو حي في العالم.',
+  useMyLoc:'استخدم موقعي الحالي', useMyLocSub:'GPS + تحديد موقع عكسي',
+  orSearchPlace:'أو ابحث عن أي مكان', presets:'مواقع مسقط', searchResults:'نتائج البحث',
+  geoDenied:'تم رفض الوصول للموقع. الرجاء اختيار موقعك بالأسفل.',
+  geoFail:'لم نتمكن من تحديد موقعك.',
+  geoUnsupported:'المتصفح لا يدعم تحديد الموقع.',
+  pickLocationTitle:'أين أنت؟',
+  pickLocationSub:'لم نتمكن من تحديد موقعك تلقائياً. اختر موقعاً لتظهر المسافات بدقة.',
+  searchFail:'فشل البحث. حاول مجدداً.', noMatches:'لا نتائج.',
+  where:'أين', hoursLabel:'أوقات العمل',
+  filterTipsTitle:'نصائح',
+  filterTips:'يتم عرض أنشطة تجريبية. اضغط "تجربة البيانات المباشرة" لجلب أماكن حقيقية.',
+  selectLanguage:'اختر اللغة', searchLanguages:'ابحث عن لغة',
+  viewOnOsm:'عرض على OpenStreetMap',
+  youAreHere:'أنت هنا', approximateArea:'منطقة تقريبية',
+  viewDetailsBtn:'عرض التفاصيل',
+  sourceLine:'OpenStreetMap · {ago}',
+  sourceLineDemo:'بيانات تجريبية',
+  check_location:'الموقع مؤكد', check_website:'الموقع متوفر', check_phone:'الهاتف متوفر',
+  check_hours:'أوقات العمل مدرجة', check_email:'البريد متوفر', check_operator:'المشغل مدرج',
+  kindVenue:'نشاط', mapTilesFailed:'تعذر تحميل الخريطة',
+  results:'أنشطة',
+  locating:'جاري تحديد موقعك…',
+  locationFound:'تم تحديد الموقع',
+  geoWarnTitle:'موقعك يبدو تقريبياً',
+  geoWarnBody:'أبلغ المتصفح عن موقعك عند {lat}، {lng} — حوالي {dist} كم من {nearest}. قد لا تكون المسافات دقيقة.',
+  geoWarnFix:'تصحيح الموقع',
+  searchRadius:'نطاق البحث',
+},
+};
+function makeT(lang){
+  const dict = STR[lang] || STR.en;
+  const fallback = STR.en;
+  return (key, vars) => {
+    let s = dict[key] != null ? dict[key] : (fallback[key] != null ? fallback[key] : key);
+    if (vars) for (const k in vars) s = String(s).replace(new RegExp('\\{'+k+'\\}','g'), vars[k]);
+    return s;
+  };
+}
+
+const CAT_NAMES = {
+  en:{All:'All',Gym:'Gym',Fitness:'Fitness',Tennis:'Tennis',Football:'Football',Basketball:'Basketball',Swimming:'Swimming',Running:'Running',Cycling:'Cycling','Martial Arts':'Martial Arts',Hiking:'Hiking',Outdoor:'Outdoor',Chess:'Chess',Gaming:'Gaming',Community:'Community',Volunteering:'Volunteering',Study:'Study',Coding:'Coding',Technology:'Technology',Workshops:'Workshops',Art:'Art',Music:'Music',Dance:'Dance',Classes:'Classes',Competitions:'Competitions',Tournaments:'Tournaments',Hackathons:'Hackathons',Camps:'Camps',Events:'Events',Indoor:'Indoor',Other:'Other',Parks:'Parks',Library:'Library',SportsCentre:'Sports Centre',Experiences:'Experiences'},
+  ar:{All:'الكل',Gym:'صالة رياضية',Fitness:'لياقة',Tennis:'تنس',Football:'كرة قدم',Basketball:'كرة سلة',Swimming:'سباحة',Running:'جري',Cycling:'دراجات','Martial Arts':'فنون قتالية',Hiking:'مشي جبلي',Outdoor:'خارجي',Chess:'شطرنج',Gaming:'ألعاب',Community:'مجتمع',Volunteering:'تطوع',Study:'دراسة',Coding:'برمجة',Technology:'تقنية',Workshops:'ورش عمل',Art:'فنون',Music:'موسيقى',Dance:'رقص',Classes:'دروس',Competitions:'منافسات',Tournaments:'دوريات',Hackathons:'هاكاثون',Camps:'مخيمات',Events:'فعاليات',Indoor:'داخلي',Other:'أخرى',Parks:'حدائق',Library:'مكتبة',SportsCentre:'مركز رياضي',Experiences:'تجارب'},
+};
+function catLabel(lang, id){ return (CAT_NAMES[lang]||{})[id] || CAT_NAMES.en[id] || id; }
+
+const CATEGORY_COLORS = {
+  Tennis:'#ea580c', Football:'#059669', Basketball:'#dc2626', Swimming:'#0891b2',
+  Running:'#7c3aed', Cycling:'#0d9488', Hiking:'#65a30d', 'Martial Arts':'#b91c1c',
+  Chess:'#475569', Gaming:'#9333ea', Study:'#0284c7', Coding:'#4f46e5',
+  Technology:'#0e7490', Hackathons:'#6d28d9', Workshops:'#c2410c', Art:'#db2777',
+  Music:'#e11d48', Dance:'#c026d3', Volunteering:'#16a34a', Community:'#ca8a04',
+  Fitness:'#ea580c', Outdoor:'#65a30d', Indoor:'#64748b', Competitions:'#dc2626',
+  Tournaments:'#b45309', Classes:'#2563eb', Camps:'#047857', Events:'#7c3aed', Other:'#94a3b8',
+  Gym:'#ea580c', Parks:'#16a34a', Library:'#0284c7', SportsCentre:'#ea580c', Experiences:'#ec4899',
+};
+const CATEGORIES = [
+  {id:'All',group:'All'},{id:'Experiences',group:'Experiences'},
+  {id:'Tennis',group:'Sports'},{id:'Football',group:'Sports'},{id:'Basketball',group:'Sports'},
+  {id:'Swimming',group:'Sports'},{id:'Running',group:'Sports'},{id:'Cycling',group:'Sports'},
+  {id:'Martial Arts',group:'Sports'},{id:'Gym',group:'Fitness'},{id:'Fitness',group:'Fitness'},
+  {id:'Hiking',group:'Outdoor'},{id:'Outdoor',group:'Outdoor'},{id:'Parks',group:'Outdoor'},
+  {id:'Chess',group:'Social'},{id:'Gaming',group:'Social'},{id:'Community',group:'Social'},
+  {id:'Volunteering',group:'Social'},
+  {id:'Study',group:'Learning'},{id:'Library',group:'Learning'},{id:'Coding',group:'Learning'},
+  {id:'Technology',group:'Learning'},{id:'Workshops',group:'Learning'},{id:'Art',group:'Learning'},
+  {id:'Music',group:'Learning'},{id:'Dance',group:'Learning'},{id:'Classes',group:'Learning'},
+  {id:'Competitions',group:'Events'},{id:'Tournaments',group:'Events'},{id:'Hackathons',group:'Events'},
+  {id:'Camps',group:'Events'},{id:'Events',group:'Events'},
+  {id:'Indoor',group:'Other'},{id:'SportsCentre',group:'Other'},{id:'Other',group:'Other'},
+];
+const CAT_MAP = Object.fromEntries(CATEGORIES.map(c=>[c.id,c]));
+const GROUP_ORDER = ['Experiences','Sports','Fitness','Outdoor','Learning','Social','Events','Other'];
+const GROUP_LABELS = {
+  en:{Experiences:'Experiences',Sports:'Sports',Fitness:'Fitness',Outdoor:'Outdoor',Learning:'Learning',Social:'Social & Community',Events:'Events',Other:'More'},
+  ar:{Experiences:'تجارب',Sports:'رياضة',Fitness:'لياقة',Outdoor:'خارجي',Learning:'تعلّم',Social:'اجتماعي',Events:'فعاليات',Other:'المزيد'}
+};
+function groupLabel(lang, g){ return (GROUP_LABELS[lang] && GROUP_LABELS[lang][g]) || GROUP_LABELS.en[g] || g; }
+
+const PRESET_LOCATIONS = [
+  {label:'Seeb, Muscat',area:'Seeb',lat:23.6703,lng:58.1894},
+  {label:'Al Khoudh, Muscat',area:'Al Khoudh',lat:23.5980,lng:58.1530},
+  {label:'Al Mawaleh, Muscat',area:'Al Mawaleh',lat:23.6152,lng:58.2214},
+  {label:'Al Hail, Muscat',area:'Al Hail',lat:23.6426,lng:58.1962},
+  {label:'Al Azaiba, Muscat',area:'Al Azaiba',lat:23.6013,lng:58.1982},
+  {label:'Al Ghubrah, Muscat',area:'Al Ghubrah',lat:23.5859,lng:58.1775},
+  {label:'Al Khuwair, Muscat',area:'Al Khuwair',lat:23.5885,lng:58.2101},
+  {label:'Qurum, Muscat',area:'Qurum',lat:23.6099,lng:58.2266},
+  {label:'Bawshar, Muscat',area:'Bawshar',lat:23.5828,lng:58.1894},
+  {label:'Madinat Al Sultan Qaboos',area:'MSQ',lat:23.6010,lng:58.2266},
+  {label:'Ruwi, Muscat',area:'Ruwi',lat:23.5908,lng:58.2323},
+  {label:'Muttrah, Muscat',area:'Muttrah',lat:23.6167,lng:58.2550},
+];
+
+/* ============= HELPERS ============= */
+function agoLabel(iso){
+  const diff = (Date.now() - new Date(iso).getTime())/60000;
+  if (diff < 1) return 'now';
+  if (diff < 60) return `${Math.round(diff)}m ago`;
+  const h = diff/60;
+  if (h < 24) return `${Math.round(h)}h ago`;
+  return `${Math.round(h/24)}d ago`;
+}
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function fmtDist(km){ return km < 1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1)} km`; }
+function nowIso(){ return new Date().toISOString(); }
+function fmtTimeFromMins(m){
+  const hh = Math.floor(m/60) % 24;
+  const mm = m % 60;
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  const h12 = hh % 12 || 12;
+  return mm === 0 ? `${h12} ${ampm}` : `${h12}:${String(mm).padStart(2,'0')} ${ampm}`;
+}
+
+/* ============= OPENING_HOURS PARSER ============= */
+function computeOpenStatus(hours){
+  if (!hours) return { isOpen:null, label:'Hours not listed', shortLabel:'Hours not listed' };
+  const h = hours.trim().toLowerCase();
+  if (h === '24/7' || h.includes('24/7')) return { isOpen:true, label:'Open 24/7', shortLabel:'Open 24/7' };
+  if (h.includes('sunrise') || h.includes('sunset')) return { isOpen:null, label:hours, shortLabel:hours };
+  const now = new Date();
+  const dayIdx = now.getDay();
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+  const dayMap = { su:0, mo:1, tu:2, we:3, th:4, fr:5, sa:6 };
+  const dayOrder = ['mo','tu','we','th','fr','sa','su'];
+  function expandDayRange(spec){
+    const parts = spec.split(',').map(s=>s.trim()).filter(Boolean);
+    const days = new Set();
+    for (const part of parts){
+      const range = part.match(/^([a-z]{2})-([a-z]{2})$/i);
+      if (range){
+        const startIdx = dayOrder.indexOf(range[1].toLowerCase().slice(0,2));
+        const endIdx = dayOrder.indexOf(range[2].toLowerCase().slice(0,2));
+        if (startIdx === -1 || endIdx === -1) continue;
+        let i = startIdx;
+        for (let guard=0; guard<8; guard++){
+          days.add(dayMap[dayOrder[i]]);
+          if (i === endIdx) break;
+          i = (i + 1) % 7;
+        }
+      } else {
+        const abbrev = part.toLowerCase().slice(0,2);
+        if (dayMap[abbrev] !== undefined) days.add(dayMap[abbrev]);
+      }
+    }
+    return days;
+  }
+  function parseTimeRanges(str){
+    const ranges = [];
+    const re = /(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g;
+    let m;
+    while ((m = re.exec(str)) !== null){
+      ranges.push({ open: parseInt(m[1])*60 + parseInt(m[2]), close: parseInt(m[3])*60 + parseInt(m[4]) });
+    }
+    return ranges;
+  }
+  const rules = hours.split(';').map(s=>s.trim()).filter(Boolean);
+  let matchedToday = false;
+  let todayRanges = [];
+  let nextOpenToday = null;
+  for (const rule of rules){
+    const m = rule.match(/^([A-Za-z,\s-]+?)\s+(.+)$/);
+    if (!m) continue;
+    const daySpec = m[1].trim();
+    const timeSpec = m[2].trim();
+    if (/^off$/i.test(timeSpec)) continue;
+    if (/^PH/i.test(daySpec)) continue;
+    const days = expandDayRange(daySpec);
+    if (days.has(dayIdx)){
+      matchedToday = true;
+      const ranges = parseTimeRanges(timeSpec);
+      for (const r of ranges){
+        todayRanges.push(r);
+        if (r.open > currentMins){
+          if (nextOpenToday === null || r.open < nextOpenToday) nextOpenToday = r.open;
+        }
+      }
+    }
+  }
+  if (!matchedToday) return { isOpen:false, label:'Closed today', shortLabel:'Closed today' };
+  for (const r of todayRanges){
+    const closeMins = r.close === 0 ? 1440 : r.close;
+    if (r.close > r.open){
+      if (currentMins >= r.open && currentMins < closeMins){
+        return { isOpen:true, label:`Open now · closes ${fmtTimeFromMins(closeMins)}`, shortLabel:'Open now' };
+      }
+    } else {
+      if (currentMins >= r.open || currentMins < r.close){
+        return { isOpen:true, label:'Open now', shortLabel:'Open now' };
+      }
+    }
+  }
+  if (nextOpenToday !== null){
+    const timeStr = fmtTimeFromMins(nextOpenToday);
+    return { isOpen:false, label:`Closed · opens ${timeStr}`, shortLabel:`Opens ${timeStr}` };
+  }
+  return { isOpen:false, label:'Closed now', shortLabel:'Closed now' };
+}
+
+/* ============= ACTIVITY EXTRACTION FROM OSM TAGS ============= */
+const SPORT_TO_ACTIVITY = {
+  tennis:'Tennis', soccer:'Football', football:'Football', futsal:'Football',
+  basketball:'Basketball', swimming:'Swimming', athletics:'Running',
+  cycling:'Cycling', climbing:'Climbing', martial_arts:'Martial Arts',
+  karate:'Karate', judo:'Judo', taekwondo:'Taekwondo', boxing:'Boxing',
+  yoga:'Yoga', golf:'Golf', equestrian:'Horse riding', karting:'Karting',
+  paintball:'Paintball', laser_tag:'Laser tag', chess:'Chess',
+  table_tennis:'Table tennis', badminton:'Badminton', volleyball:'Volleyball',
+  handball:'Handball', rugby:'Rugby', cricket:'Cricket', sailing:'Sailing',
+  rowing:'Rowing', surfing:'Surfing', diving:'Diving',
+};
+const LEISURE_TO_ACTIVITY = {
+  fitness_centre:'Gym', sports_centre:'Multi-sport', swimming_pool:'Swimming',
+  bowling_alley:'Bowling', escape_game:'Escape room', trampoline_park:'Trampoline',
+  amusement_arcade:'Arcade', water_park:'Water park', miniature_golf:'Mini golf',
+  park:'Outdoor', garden:'Garden', pitch:'Team sports', stadium:'Stadium',
+  dance:'Dance', climbing:'Climbing', sports_hall:'Indoor sports',
+  indoor_play:'Indoor play',
+};
+const AMENITY_TO_ACTIVITY = {
+  library:'Reading', community_centre:'Community', arts_centre:'Art',
+  theatre:'Theatre', cinema:'Cinema', dojo:'Martial arts', music_school:'Music lessons',
+  dancing_school:'Dance lessons', language_school:'Language classes',
+  driving_school:'Driving lessons', gym:'Gym', social_facility:'Volunteering',
+  coworking_space:'Coworking', internet_cafe:'Gaming',
+};
+const TOURISM_TO_ACTIVITY = {
+  zoo:'Zoo', aquarium:'Aquarium', theme_park:'Theme park', museum:'Museum',
+  viewpoint:'Viewpoint', camp_site:'Camping',
+};
+function extractActivities(tags){
+  const set = new Set();
+  const sport = (tags.sport || '').toLowerCase().split(';').map(s=>s.trim());
+  const leisure = (tags.leisure || '').toLowerCase().split(';').map(s=>s.trim());
+  const amenity = (tags.amenity || '').toLowerCase().split(';').map(s=>s.trim());
+  const tourism = (tags.tourism || '').toLowerCase().split(';').map(s=>s.trim());
+  const club = (tags.club || '').toLowerCase().split(';').map(s=>s.trim());
+  for (const s of sport) if (SPORT_TO_ACTIVITY[s]) set.add(SPORT_TO_ACTIVITY[s]);
+  for (const l of leisure) if (LEISURE_TO_ACTIVITY[l]) set.add(LEISURE_TO_ACTIVITY[l]);
+  for (const a of amenity) if (AMENITY_TO_ACTIVITY[a]) set.add(AMENITY_TO_ACTIVITY[a]);
+  for (const t of tourism) if (TOURISM_TO_ACTIVITY[t]) set.add(TOURISM_TO_ACTIVITY[t]);
+  for (const c of club){
+    if (c === 'sport') set.add('Sports club');
+    if (c === 'chess') set.add('Chess');
+    if (c === 'music') set.add('Music');
+    if (c === 'art') set.add('Art');
+  }
+  return Array.from(set);
+}
+
+/* ============= OVERPASS ============= */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+];
+let lastGoodEndpoint = null;
+
+function buildOverpassQuery(lat, lng, radiusMeters, categoryId){
+  const a = `(around:${radiusMeters},${lat},${lng})`;
+  const filters = CATEGORY_OSM_FILTERS[categoryId] || CATEGORY_OSM_FILTERS['All'];
+  const selectors = filters.map(f => `${f}${a};`).join('');
+  return `[out:json][timeout:20][maxsize:8Mi];(${selectors});out center tags 80;`;
+}
+async function fetchOverpass(lat, lng, radiusKm, categoryId, onRetry){
+  const query = buildOverpassQuery(lat, lng, Math.round(radiusKm*1000), categoryId);
+  let endpoints = [...OVERPASS_ENDPOINTS];
+  if (lastGoodEndpoint && endpoints.includes(lastGoodEndpoint)){
+    endpoints = [lastGoodEndpoint, ...endpoints.filter(e => e !== lastGoodEndpoint)];
+  }
+  let lastErr = null;
+  for (let i = 0; i < endpoints.length; i++){
+    const url = endpoints[i];
+    if (i > 0 && onRetry) onRetry(i);
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 15000);
+    try{
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok){ lastErr = new Error(`Overpass ${res.status}`); continue; }
+      const text = await res.text();
+      if (!text.trim().startsWith('{')){ lastErr = new Error('Non-JSON response'); continue; }
+      const json = JSON.parse(text);
+      lastGoodEndpoint = url;
+      return { elements: json.elements || [], endpoint: url };
+    } catch(e){
+      clearTimeout(timer);
+      lastErr = e;
+      await new Promise(r=>setTimeout(r, 400));
+    }
+  }
+  throw lastErr || new Error('All Overpass endpoints failed');
+}
+
+function categorize(tags){
+  const sport = (tags.sport||'').toLowerCase();
+  const leisure = (tags.leisure||'').toLowerCase();
+  const amenity = (tags.amenity||'').toLowerCase();
+  const club = (tags.club||'').toLowerCase();
+  const tourism = (tags.tourism||'').toLowerCase();
+  if (leisure==='escape_game') return 'Experiences';
+  if (leisure==='bowling_alley') return 'Experiences';
+  if (leisure==='trampoline_park') return 'Experiences';
+  if (leisure==='amusement_arcade') return 'Experiences';
+  if (leisure==='water_park') return 'Experiences';
+  if (leisure==='miniature_golf') return 'Experiences';
+  if (sport.includes('karting') || sport.includes('paintball') || sport.includes('laser_tag')) return 'Experiences';
+  if (tourism==='zoo' || tourism==='aquarium' || tourism==='theme_park') return 'Experiences';
+  if (sport.includes('tennis')) return 'Tennis';
+  if (sport.includes('soccer')||sport.includes('football')||sport.includes('futsal')) return 'Football';
+  if (sport.includes('basketball')) return 'Basketball';
+  if (sport.includes('swim')) return 'Swimming';
+  if (sport.includes('martial')||sport.includes('karate')||sport.includes('judo')||sport.includes('taekwondo')||sport.includes('boxing')) return 'Martial Arts';
+  if (sport.includes('climb')) return 'Hiking';
+  if (sport.includes('cycl')) return 'Cycling';
+  if (sport.includes('run')||sport.includes('athletics')) return 'Running';
+  if (sport.includes('yoga')) return 'Fitness';
+  if (sport.includes('chess')) return 'Chess';
+  if (leisure==='fitness_centre') return 'Gym';
+  if (leisure==='sports_centre') return 'SportsCentre';
+  if (leisure==='swimming_pool') return 'Swimming';
+  if (leisure==='stadium') return 'Competitions';
+  if (leisure==='park' || leisure==='garden') return 'Parks';
+  if (leisure==='playground') return 'Parks';
+  if (leisure==='climbing') return 'Hiking';
+  if (leisure==='dance') return 'Dance';
+  if (leisure==='pitch'){
+    if (sport.includes('tennis')) return 'Tennis';
+    if (sport.includes('basket')) return 'Basketball';
+    if (sport.includes('soccer')||sport.includes('football')) return 'Football';
+    return 'Fitness';
+  }
+  if (amenity==='library') return 'Library';
+  if (amenity==='community_centre') return 'Community';
+  if (amenity==='arts_centre') return 'Art';
+  if (amenity==='music_school') return 'Music';
+  if (amenity==='dancing_school') return 'Dance';
+  if (amenity==='language_school' || amenity==='driving_school') return 'Classes';
+  if (amenity==='theatre' || amenity==='cinema') return 'Events';
+  if (amenity==='dojo') return 'Martial Arts';
+  if (amenity==='internet_cafe') return 'Gaming';
+  if (club.includes('chess')) return 'Chess';
+  if (club.includes('music')) return 'Music';
+  if (club.includes('sport')) return 'Fitness';
+  return 'Other';
+}
+function subcategoryFor(tags){
+  const sport = tags.sport ? tags.sport.replace(/_/g,' ') : '';
+  const leisure = tags.leisure ? tags.leisure.replace(/_/g,' ') : '';
+  const amenity = tags.amenity ? tags.amenity.replace(/_/g,' ') : '';
+  const tourism = tags.tourism ? tags.tourism.replace(/_/g,' ') : '';
+  const val = sport || leisure || amenity || tourism;
+  return val ? val.charAt(0).toUpperCase() + val.slice(1) : 'Activity';
+}
+function elementToActivity(el, userLoc, area, t){
+  const tags = el.tags || {};
+  const lat = el.lat != null ? el.lat : (el.center && el.center.lat);
+  const lng = el.lon != null ? el.lon : (el.center && el.center.lon);
+  if (lat == null || lng == null) return null;
+  const name = tags['name:en'] || tags.name || tags['name:ar'] || null;
+  if (!name) return null;
+  const category = categorize(tags);
+  const sub = subcategoryFor(tags);
+  const offers = extractActivities(tags);
+  const dist = userLoc ? haversine(userLoc.lat, userLoc.lng, lat, lng) : 0;
+  const addrParts = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city'], tags['addr:state']].filter(Boolean);
+  const address = addrParts.length ? addrParts.join(', ') : (tags['addr:full'] || `${name} — approximate location`);
+  let score = 40;
+  const checks = [t('check_location')];
+  if (tags.website || tags['contact:website']) { score += 25; checks.push(t('check_website')); }
+  if (tags.phone || tags['contact:phone']) { score += 15; checks.push(t('check_phone')); }
+  if (tags.opening_hours) { score += 10; checks.push(t('check_hours')); }
+  if (tags.email || tags['contact:email']) { score += 5; checks.push(t('check_email')); }
+  if (tags.operator) { score += 5; checks.push(t('check_operator')); }
+  score = Math.min(score, 95);
+  const verification = score >= 75 ? 'verified' : (score >= 55 ? 'official' : 'needs_confirm');
+  const descParts = [];
+  if (tags.description) descParts.push(tags.description);
+  if (offers.length) descParts.push(`Activities available: ${offers.join(', ')}.`);
+  if (tags.opening_hours) descParts.push(`Opening hours: ${tags.opening_hours}.`);
+  if (tags.operator) descParts.push(`Operated by ${tags.operator}.`);
+  descParts.push(t('sourceIsCommunity'));
+  const description = descParts.join(' ');
+  const osmType = el.type;
+  const source_url = `https://www.openstreetmap.org/${osmType}/${el.id}`;
+  return {
+    id: `osm-${osmType}-${el.id}`,
+    name, category, subcategory: sub, type: t('kindVenue'),
+    offers,
+    organizer: tags.operator || name,
+    description, lat, lng, address,
+    area: areaFromCoords(lat, lng, area),
+    opening_hours: tags.opening_hours || null,
+    open_status: computeOpenStatus(tags.opening_hours),
+    website: tags.website || tags['contact:website'] || null,
+    phone: tags.phone || tags['contact:phone'] || null,
+    email: tags.email || tags['contact:email'] || null,
+    source_url, source_name:'OpenStreetMap', source_type:'open_data',
+    verification, score, checks,
+    last_checked: nowIso(),
+    distance_km: dist,
+    is_demo: false,
+  };
+}
+function elementsToActivities(elements, userLoc, area, t){
+  const out = [];
+  const seen = new Set();
+  for (const el of elements){
+    const a = elementToActivity(el, userLoc, area, t);
+    if (!a) continue;
+    const key = `${a.name.toLowerCase()}|${a.lat.toFixed(4)}|${a.lng.toFixed(4)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(a);
+  }
+  out.sort((a,b)=> a.distance_km - b.distance_km);
+  return out;
+}
+function getDemoActivities(userLoc, catId){
+  return DEMO_ACTIVITIES
+    .filter(a => catId === 'All' || a.category === catId)
+    .map(a => {
+      const dist = haversine(userLoc.lat, userLoc.lng, a.lat, a.lng);
+      const area = areaFromCoords(a.lat, a.lng, 'Oman');
+      return { ...a, area, distance_km: dist, open_status: computeOpenStatus(a.opening_hours) };
+    })
+    .sort((a,b) => a.distance_km - b.distance_km);
+}
+async function reverseGeocode(lat, lng){
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, { headers:{'Accept':'application/json'} });
+    const j = await r.json();
+    const a = j.address || {};
+    const area = a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.county || '';
+    const city = a.city || a.state || a.country || '';
+    const label = [area, city].filter(Boolean).join(', ') || j.display_name || 'Current location';
+    return { label, area: area || city || 'Nearby' };
+  } catch(e){ return { label:'Current location', area:'Nearby' }; }
+}
+function useLS(key, initial){
+  const [v, setV] = useState(()=>{
+    try{ const s = localStorage.getItem(key); return s ? JSON.parse(s) : initial; }
+    catch{ return initial; }
+  });
+  useEffect(()=>{ try{ localStorage.setItem(key, JSON.stringify(v)); }catch{} }, [key, v]);
+  return [v, setV];
+}
+function parseQuery(q){
+  const f = {};
+  if (!q) return f;
+  const lower = q.toLowerCase();
+  const aliases = {
+    tennis:'Tennis', football:'Football', soccer:'Football', basketball:'Basketball',
+    swim:'Swimming', run:'Running', cycl:'Cycling', bike:'Cycling',
+    hik:'Hiking', karate:'Martial Arts', martial:'Martial Arts',
+    chess:'Chess', game:'Gaming', gaming:'Gaming',
+    study:'Study', library:'Library', coding:'Coding', program:'Coding',
+    tech:'Technology', hackathon:'Hackathons', workshop:'Workshops',
+    art:'Art', paint:'Art', music:'Music', guitar:'Music', dance:'Dance',
+    volunteer:'Volunteering', community:'Community',
+    gym:'Gym', fitness:'Fitness', yoga:'Fitness',
+    park:'Parks', garden:'Parks',
+    bowling:'Experiences', 'escape room':'Experiences', arcade:'Experiences',
+    trampoline:'Experiences', zoo:'Experiences', aquarium:'Experiences',
+    outdoor:'Outdoor', indoor:'Indoor',
+    tournament:'Tournaments', competition:'Competitions',
+    class:'Classes', course:'Classes', lesson:'Classes',
+    camp:'Camps', event:'Events',
+  };
+  for (const k in aliases){ if (lower.includes(k)){ f.category = aliases[k]; break; } }
+  const cleaned = q.replace(/\b(near me|nearby|around me|within \d+ km|under \d+|for|the|a|an|in|at|and|to|of|i|want|things to do|activities?)\b/gi,'').trim();
+  if (cleaned.length > 1) f.text = cleaned;
+  return f;
+}
+
+/* ============================================================
+   GOOGLE MAPS DIRECTIONS URL — path-based format
+   ============================================================ */
+function googleMapsDirectionsUrl(destLat, destLng, originLat, originLng){
+  const dLat = Number(destLat);
+  const dLng = Number(destLng);
+  if (!isFinite(dLat) || !isFinite(dLng) ||
+      dLat < -90 || dLat > 90 || dLng < -180 || dLng > 180){
+    return '#';
+  }
+  if (originLat != null && originLng != null){
+    const oLat = Number(originLat);
+    const oLng = Number(originLng);
+    if (isFinite(oLat) && isFinite(oLng) &&
+        oLat >= -90 && oLat <= 90 && oLng >= -180 && oLng <= 180){
+      return `https://www.google.com/maps/dir/${oLat},${oLng}/${dLat},${dLng}/`;
+    }
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${dLat},${dLng}`;
+}
+function osmDirectionsUrl(destLat, destLng, originLat, originLng){
+  const dLat = Number(destLat);
+  const dLng = Number(destLng);
+  if (!isFinite(dLat) || !isFinite(dLng)) return '#';
+  if (originLat != null && originLng != null){
+    const oLat = Number(originLat);
+    const oLng = Number(originLng);
+    if (isFinite(oLat) && isFinite(oLng)){
+      return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${oLat}%2C${oLng}%3B${dLat}%2C${dLng}`;
+    }
+  }
+  return `https://www.openstreetmap.org/?mlat=${dLat}&mlon=${dLng}#map=17/${dLat}/${dLng}`;
+}
+
+/* ============================================================
+   GEO SANITY CHECK
+   ============================================================ */
+function isCoordinateNearOman(lat, lng){
+  let bestD = Infinity;
+  for (const a of OMAN_AREA_CENTRES){
+    const d = haversine(lat, lng, a.lat, a.lng);
+    if (d < bestD) bestD = d;
+  }
+  return bestD;
+}
+function isGeoTrustworthy(lat, lng, accuracyMeters){
+  if (accuracyMeters != null && accuracyMeters > 500) return { ok:false, reason:'poor-accuracy' };
+  const d = isCoordinateNearOman(lat, lng);
+  if (d > 150) return { ok:false, reason:'far-from-known' };
+  return { ok:true, nearest: d };
+}
+
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
+function Header({ location, onOpenLocation, lang, onOpenLang, onOpenAdmin, onRefresh, loading, t, geoState, isLive, onToggleLive }){
+  return (
+    <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-2xl grad flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
+            <Ic.Sparkles className="w-5 h-5 text-white"/>
+          </div>
+          <div className="min-w-0 hidden sm:block">
+            <h1 className="text-[15px] font-extrabold leading-tight tracking-tight truncate">{t('appName')}</h1>
+            <p className="text-[11px] text-slate-500 leading-tight truncate">
+              {isLive ? t('liveOn') : t('demoMode')}
+            </p>
+          </div>
+        </div>
+        <button onClick={onToggleLive} disabled={loading}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition active:scale-95 shrink-0 ${
+            isLive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+          } disabled:opacity-50`}>
+          {loading ? <Ic.Refresh className="w-3.5 h-3.5 animate-spin"/> : isLive ? <Ic.Wifi className="w-3.5 h-3.5"/> : <Ic.WifiOff className="w-3.5 h-3.5"/>}
+          <span className="hidden sm:inline">{isLive ? t('backToDemo') : t('tryLive')}</span>
+          <span className="sm:hidden">{isLive ? 'Demo' : 'Live'}</span>
+        </button>
+        <button onClick={onOpenLocation}
+          className="flex flex-col items-start px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 transition text-sm font-semibold text-slate-700 min-w-0 max-w-[44%] sm:max-w-xs">
+          <div className="flex items-center gap-2 min-w-0 w-full">
+            <Ic.Pin className="w-4 h-4 text-indigo-600 shrink-0"/>
+            <span className="truncate">{location.label}</span>
+            <Ic.ChevD className="w-3.5 h-3.5 text-slate-400 shrink-0"/>
+          </div>
+          <span className="text-[9px] text-slate-400 font-mono leading-none mt-0.5 truncate w-full">
+            {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+          </span>
+        </button>
+        <button onClick={onRefresh} disabled={loading}
+          className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 transition text-slate-600 disabled:opacity-50 shrink-0" aria-label="Refresh">
+          <Ic.Refresh className={`w-4 h-4 ${loading?'animate-spin':''}`}/>
+        </button>
+        <button onClick={onOpenLang}
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 transition text-xs font-bold text-slate-600 shrink-0">
+          <Ic.Language className="w-4 h-4"/>
+          <span className="hidden sm:inline">{lang==='ar'?'العربية':'English'}</span>
+          <span className="sm:hidden">{lang.toUpperCase()}</span>
+        </button>
+        <button onClick={onOpenAdmin}
+          className="hidden md:flex p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 transition text-slate-600 shrink-0" aria-label="Admin">
+          <Ic.Chart className="w-4 h-4"/>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function SearchBar({ value, onChange, onSubmit, t }){
+  const examples = ['Tennis','Bowling','Library','Escape room'];
+  const [focused, setFocused] = useState(false);
+  return (
+    <div className="relative w-full">
+      <form onSubmit={e=>{ e.preventDefault(); onSubmit(); }} className="relative w-full">
+        <div className={`relative flex items-center rounded-2xl bg-white transition-all duration-200 ${focused?'ring-4 ring-indigo-100 border-indigo-400 shadow-lg shadow-indigo-500/10':'border-slate-200 shadow-sm'} border-2`}>
+          <Ic.Search className="w-5 h-5 text-slate-400 ml-4 shrink-0"/>
+          <input value={value} onChange={e=>onChange(e.target.value)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
+            placeholder={t('search_ph')}
+            className="flex-1 min-w-0 px-3 py-4 bg-transparent outline-none text-[15px] font-medium placeholder:text-slate-400"/>
+          {value && <button type="button" onClick={()=>onChange('')} className="p-2 rounded-full hover:bg-slate-100 shrink-0"><Ic.X className="w-4 h-4 text-slate-400"/></button>}
+          <button type="submit" className="hidden sm:flex items-center gap-1.5 m-1.5 px-4 py-2.5 rounded-xl grad text-white font-bold text-sm active:scale-95 shrink-0">{t('search')}</button>
+        </div>
+      </form>
+      {!focused && !value && (
+        <div className="hscroll no-sb gap-2 mt-3 py-1">
+          {examples.map(ex=>(
+            <button key={ex} onClick={()=>{ onChange(ex); onSubmit(ex); }}
+              className="whitespace-nowrap text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 px-3 py-1.5 rounded-full">
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryRow({ selected, onSelect, lang, activities, t }){
+  const [showMore, setShowMore] = useState(false);
+  const counts = useMemo(()=>{
+    const m = {};
+    activities.forEach(a=> m[a.category] = (m[a.category]||0)+1);
+    return m;
+  }, [activities]);
+  const topIds = ['All','Experiences','Tennis','Football','Swimming','Fitness','Gym','Library','Parks','Events'];
+  return (
+    <>
+      <div className="hscroll no-sb gap-2 py-1">
+        {topIds.map(id=>{
+          const c = CAT_MAP[id]; if (!c) return null;
+          const Ico = CAT_ICONS[id] || Ic.Tag;
+          const active = selected === id;
+          const color = CATEGORY_COLORS[id] || '#6366f1';
+          const count = id === 'All' ? activities.length : (counts[id]||0);
+          return (
+            <button key={id} onClick={()=>onSelect(active && id!=='All' ? 'All' : id)}
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border-2 transition font-bold text-sm active:scale-95 ${active?'text-white border-transparent shadow-lg':'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}
+              style={active?{ background:color, boxShadow:`0 8px 20px -6px ${color}66` }:{}}>
+              <Ico className="w-4 h-4"/>
+              <span className="whitespace-nowrap">{catLabel(lang, id)}</span>
+              <span className={`text-[10px] font-bold px-1.5 rounded-md ${active?'bg-white/25':'bg-slate-100 text-slate-500'}`}>{count}</span>
+            </button>
+          );
+        })}
+        <button onClick={()=>setShowMore(true)}
+          className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border-2 border-dashed border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 transition font-bold text-sm bg-white active:scale-95">
+          <Ic.Grid className="w-4 h-4"/><span className="whitespace-nowrap">{t('more')}</span>
+        </button>
+      </div>
+      {showMore && (
+        <div className="fixed inset-0 z-[70] backdrop fi" onClick={()=>setShowMore(false)}>
+          <div className="absolute inset-x-0 bottom-0 top-0 sm:top-16 sm:max-w-2xl sm:mx-auto bg-white sm:rounded-3xl overflow-hidden su flex flex-col" onClick={e=>e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-lg font-extrabold tracking-tight">{t('allCategories')}</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{t('tapCategory')}</p>
+              </div>
+              <button onClick={()=>setShowMore(false)} className="p-2 rounded-full hover:bg-slate-100"><Ic.X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              {GROUP_ORDER.map(g=>{
+                const items = CATEGORIES.filter(c=>c.group===g);
+                if (!items.length) return null;
+                return (
+                  <div key={g} className="mb-6 last:mb-0">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{groupLabel(lang, g)}</h3>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {items.map(c=>{
+                        const Ico = CAT_ICONS[c.id] || Ic.Tag;
+                        const active = selected === c.id;
+                        const color = CATEGORY_COLORS[c.id] || '#6366f1';
+                        const count = c.id === 'All' ? activities.length : (counts[c.id]||0);
+                        return (
+                          <button key={c.id} onClick={()=>{ onSelect(c.id); setShowMore(false); }}
+                            className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition active:scale-95 ${active?'border-transparent':'border-slate-100 hover:border-slate-200 bg-white'} ${count===0&&c.id!=='All'?'opacity-45':''}`}
+                            style={active?{background:color+'15', borderColor:color}:{}}>
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{background:active?color:color+'18', color:active?'#fff':color}}>
+                              <Ico className="w-5 h-5"/>
+                            </div>
+                            <span className="text-[11px] font-bold text-center leading-tight" style={{color:active?color:'#334155'}}>
+                              {catLabel(lang, c.id)}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 tabular-nums">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function QuickChips({ filters, setFilters, onOpenFilters, t }){
+  const chips = [
+    { id:'open', label: t('openNow'), test:f=>f.openNow, apply:f=>({...f, openNow:!f.openNow}) },
+    { id:'contact', label: t('hasContact'), test:f=>f.hasContact, apply:f=>({...f, hasContact:!f.hasContact}) },
+    { id:'near', label: `${t('nearby')} (2 km)`, test:f=>f.distance===2, apply:f=>({...f, distance:f.distance===2?null:2}) },
+  ];
+  return (
+    <div className="hscroll no-sb gap-2 py-1">
+      {chips.map(c=>{
+        const on = c.test(filters);
+        return (
+          <button key={c.id} onClick={()=>setFilters(c.apply(filters))}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-bold transition active:scale-95 ${on?'chip-on':'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+            {on && <Ic.Check className="w-3 h-3"/>}
+            <span className="whitespace-nowrap">{c.label}</span>
+          </button>
+        );
+      })}
+      <button onClick={onOpenFilters}
+        className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:border-slate-300">
+        <Ic.Sliders className="w-3.5 h-3.5"/><span className="whitespace-nowrap">{t('allFilters')}</span>
+      </button>
+    </div>
+  );
+}
+
+function FiltersPanel({ filters, setFilters, onClose, resultsCount, t }){
+  const update = (patch) => setFilters({...filters, ...patch});
+  const clearAll = () => setFilters({ distance:null, openNow:false, hasContact:false });
+  const Section = ({ title, children }) => (
+    <div className="py-4 border-b border-slate-100 last:border-0">
+      <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-3">{title}</h3>
+      {children}
+    </div>
+  );
+  const Btn = ({ active, onClick, children }) => (
+    <button onClick={onClick}
+      className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition active:scale-95 ${active?'chip-on':'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+      {children}
+    </button>
+  );
+  return (
+    <div className="flex flex-col h-full min-w-0">
+      <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold tracking-tight flex items-center gap-2"><Ic.Filter className="w-5 h-5 text-indigo-600"/> {t('filters')}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">{resultsCount} {t('results')}</p>
+        </div>
+        <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 lg:hidden shrink-0"><Ic.X className="w-5 h-5"/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 pb-40">
+        <Section title={t('distance')}>
+          <div className="flex flex-wrap gap-2">
+            {[0.5,1,2,5,10,25].map(d=> <Btn key={d} active={filters.distance===d} onClick={()=>update({ distance: filters.distance===d?null:d })}>{d<1?`${d*1000} m`:`${d} km`}</Btn>)}
+            <Btn active={filters.distance===50} onClick={()=>update({ distance: filters.distance===50?null:50 })}>50 km</Btn>
+          </div>
+        </Section>
+        <Section title={t('status')}>
+          <div className="flex flex-wrap gap-2">
+            <Btn active={filters.openNow} onClick={()=>update({ openNow: !filters.openNow })}>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-current"/>
+                {t('openNow')}
+              </span>
+            </Btn>
+            <Btn active={filters.hasContact} onClick={()=>update({ hasContact: !filters.hasContact })}>
+              <span className="flex items-center gap-1.5"><Ic.Phone className="w-3.5 h-3.5"/>{t('hasContact')}</span>
+            </Btn>
+          </div>
+        </Section>
+        <Section title={t('filterTipsTitle')}>
+          <p className="text-xs text-slate-500 leading-relaxed">{t('filterTips')}</p>
+        </Section>
+      </div>
+      <div className="p-5 border-t border-slate-100 bg-white shrink-0 flex gap-2">
+        <button onClick={clearAll} className="flex-1 py-3.5 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm active:scale-[.98]">{t('clearAll')}</button>
+        <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl grad text-white font-bold text-sm active:scale-[.98]">{t('applyFilters')}</button>
+      </div>
+    </div>
+  );
+}
+
+function primaryCta(a, t, userLoc){
+  if (a.website) return { href:a.website, label:t('openWebsite'), icon:Ic.Globe };
+  if (a.phone) return { href:`tel:${a.phone.replace(/\s+/g,'')}`, label:t('call'), icon:Ic.Phone };
+  if (a.email) return { href:`mailto:${a.email}`, label:t('sendEmail'), icon:Ic.Link };
+  const href = googleMapsDirectionsUrl(a.lat, a.lng, userLoc ? userLoc.lat : null, userLoc ? userLoc.lng : null);
+  return { href, label:t('directions'), icon:Ic.GoogleMaps };
+}
+
+function OpenStatusBadge({ activity, size='sm' }){
+  const st = activity.open_status || { isOpen:null, label:'—' };
+  const sz = size === 'lg' ? 'px-3 py-2 text-xs' : 'px-2.5 py-1.5 text-[11px]';
+  if (st.isOpen === true){
+    return (
+      <span className={`inline-flex items-center gap-1.5 ${sz} rounded-lg bg-emerald-50 text-emerald-700 font-bold`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"/>
+        {st.label}
+      </span>
+    );
+  }
+  if (st.isOpen === false){
+    return (
+      <span className={`inline-flex items-center gap-1.5 ${sz} rounded-lg bg-slate-100 text-slate-600 font-bold`}>
+        <Ic.Clock className="w-3 h-3"/>
+        {st.label}
+      </span>
+    );
+  }
+  if (activity.opening_hours){
+    return (
+      <span className={`inline-flex items-center gap-1.5 ${sz} rounded-lg bg-slate-100 text-slate-500 font-semibold max-w-full`}>
+        <Ic.Clock className="w-3 h-3 shrink-0"/>
+        <span className="truncate">{activity.opening_hours}</span>
+      </span>
+    );
+  }
+  return null;
+}
+
+function ActivityCard({ activity, userLoc, saved, onToggleSave, onOpen, index=0, lang, t }){
+  const color = CATEGORY_COLORS[activity.category] || '#6366f1';
+  const Ico = CAT_ICONS[activity.category] || Ic.Tag;
+  const dist = userLoc ? haversine(userLoc.lat, userLoc.lng, activity.lat, activity.lng) : activity.distance_km;
+  const verified = activity.verification === 'verified';
+  const official = activity.verification === 'official';
+  const cta = primaryCta(activity, t, userLoc);
+  const CtaIcon = cta.icon;
+  const isOpenNow = activity.open_status && activity.open_status.isOpen === true;
+  const isDemo = activity.is_demo;
+
+  return (
+    <article className={`bg-white rounded-3xl overflow-hidden card-s hover:card-s-h transition-all duration-300 fu min-w-0 ${isDemo?'demo-stripe':''}`} style={{animationDelay:`${Math.min(index*30,300)}ms`}}>
+      <div className="relative aspect-[16/10] overflow-hidden" style={{background:`linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`}}>
+        <div className="absolute inset-0 opacity-15 flex items-center justify-center"><Ico className="w-40 h-40 text-white" strokeWidth={1}/></div>
+        <div className="absolute inset-0" style={{background:`linear-gradient(180deg, transparent 40%, ${color}99 100%)`}}/>
+        <div className="absolute top-3 left-3 max-w-[70%] flex items-center gap-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white bg-black/25 backdrop-blur-sm">
+            <Ico className="w-3 h-3"/>{catLabel(lang, activity.category)}
+          </span>
+          {isOpenNow && (
+            <span className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white bg-emerald-600/80 backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white live-dot"/>
+              {t('openNowShort')}
+            </span>
+          )}
+          {isDemo && (
+            <span className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white bg-orange-600/90 backdrop-blur-sm">
+              <Ic.Beaker className="w-3 h-3"/>
+              DEMO
+            </span>
+          )}
+        </div>
+        <button onClick={e=>{ e.stopPropagation(); onToggleSave(activity.id); }}
+          className="absolute top-3 right-3 p-2.5 rounded-full bg-white/90 hover:bg-white backdrop-blur-sm shadow-lg active:scale-90"
+          aria-label={t('saveAria')}>
+          <Ic.Bookmark filled={saved} className={`w-4 h-4 ${saved?'text-indigo-600 pop':'text-slate-700'}`}/>
+        </button>
+        {activity.offers && activity.offers.length > 0 && (
+          <div className="absolute bottom-3 left-3 right-3 flex items-center gap-1.5 flex-wrap">
+            {activity.offers.slice(0,3).map(o=>(
+              <span key={o} className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold text-white bg-black/35 backdrop-blur-sm">
+                {o}
+              </span>
+            ))}
+            {activity.offers.length > 3 && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold text-white bg-black/35 backdrop-blur-sm">
+                +{activity.offers.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="p-4 min-w-0">
+        <h3 className="font-extrabold text-[17px] leading-snug tracking-tight l2">{activity.name}</h3>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 font-medium min-w-0">
+          <Ic.Pin className="w-3.5 h-3.5 shrink-0"/>
+          <span className="truncate">{activity.area} · {fmtDist(dist)}</span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <OpenStatusBadge activity={activity} size="sm"/>
+        </div>
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          {isDemo ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+              <Ic.Beaker className="w-3.5 h-3.5"/>
+              {t('demoSource')}
+            </div>
+          ) : (
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold ${verified?'bg-emerald-50 text-emerald-700':official?'bg-blue-50 text-blue-700':'bg-amber-50 text-amber-700'}`}>
+              {verified ? <Ic.Shield className="w-3.5 h-3.5"/> : official ? <Ic.Check className="w-3.5 h-3.5"/> : <Ic.Alert className="w-3.5 h-3.5"/>}
+              {verified ? t('verified') : official ? t('official') : t('limited')}
+            </div>
+          )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <span className="text-[11px] text-slate-400 font-medium truncate font-mono">
+            {activity.lat.toFixed(3)}, {activity.lng.toFixed(3)}
+          </span>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button onClick={()=>onOpen(activity)}
+            className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:border-slate-300 active:scale-[.98]">
+            {t('details')}
+          </button>
+          <a href={cta.href} target="_blank" rel="noopener noreferrer"
+            className="flex-1 py-2.5 rounded-xl grad text-white font-bold text-sm active:scale-[.98] flex items-center justify-center gap-1.5 min-w-0">
+            <CtaIcon className="w-3.5 h-3.5 shrink-0"/>
+            <span className="truncate">{cta.label}</span>
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function SkeletonCard(){
+  return (
+    <div className="bg-white rounded-3xl overflow-hidden card-s">
+      <div className="aspect-[16/10] skel"/>
+      <div className="p-4 space-y-3">
+        <div className="h-5 skel rounded w-3/4"/>
+        <div className="h-3.5 skel rounded w-1/2"/>
+        <div className="flex gap-2"><div className="h-6 skel rounded-lg w-20"/><div className="h-6 skel rounded-lg w-24"/></div>
+        <div className="flex gap-2 pt-2"><div className="h-10 skel rounded-xl flex-1"/><div className="h-10 skel rounded-xl flex-1"/></div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ onBroaden, onClear, reason, t }){
+  return (
+    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center fu">
+      <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5"><Ic.Search className="w-9 h-9 text-slate-400"/></div>
+      <h3 className="text-xl font-extrabold tracking-tight mb-1.5">{reason==='narrow'?t('noResultsRadius'):t('noResults')}</h3>
+      <p className="text-sm text-slate-500 max-w-md mb-6">{reason==='narrow'?t('noResultsRadiusDesc'):t('noResultsDesc')}</p>
+      <div className="flex flex-wrap gap-2 justify-center">
+        <button onClick={onBroaden} className="px-5 py-3 rounded-2xl grad text-white font-bold text-sm active:scale-95 flex items-center gap-1.5">
+          <Ic.Crosshair className="w-4 h-4"/> {t('broaden')}
+        </button>
+        <button onClick={onClear} className="px-5 py-3 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-sm active:scale-95">{t('clearFilters')}</button>
+      </div>
+    </div>
+  );
+}
+
+function GeoWarningBanner({ location, onFix, t }){
+  let nearest = null, nearestDist = Infinity;
+  for (const a of OMAN_AREA_CENTRES){
+    const d = haversine(location.lat, location.lng, a.lat, a.lng);
+    if (d < nearestDist){ nearest = a.name; nearestDist = d; }
+  }
+  return (
+    <div className="col-span-full mb-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3 text-xs font-bold text-amber-900">
+      <Ic.Warning className="w-5 h-5 shrink-0 mt-0.5"/>
+      <div className="flex-1 min-w-0">
+        <div className="font-extrabold mb-0.5">{t('geoWarnTitle')}</div>
+        <p className="font-medium leading-relaxed">
+          {t('geoWarnBody', {
+            lat: location.lat.toFixed(4),
+            lng: location.lng.toFixed(4),
+            dist: nearestDist.toFixed(0),
+            nearest: nearest,
+          })}
+        </p>
+      </div>
+      <button onClick={onFix}
+        className="shrink-0 px-3 py-2 rounded-xl bg-amber-900 text-white font-bold active:scale-95">
+        {t('geoWarnFix')}
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   MapView — with marker clustering, user pulse, radius circle
+   ============================================================ */
+function MapView({ activities, userLoc, onOpen, selectedId, t, radiusKm }){
+  const ref = useRef(null);
+  const mapRef = useRef(null);
+  const clusterRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const radiusCircleRef = useRef(null);
+  const markersRef = useRef({});
+  const [tilesFailed, setTilesFailed] = useState(false);
+
+  // Initialize map once
+  useEffect(()=>{
+    if (!ref.current || mapRef.current) return;
+    const start = userLoc && isFinite(userLoc.lat) && isFinite(userLoc.lng)
+      ? [userLoc.lat, userLoc.lng]
+      : [23.6100, 58.2000];
+    const map = L.map(ref.current, {
+      zoomControl: true,
+      attributionControl: true,
+      minZoom: 9,
+      maxZoom: 18,
+    }).setView(start, 12);
+
+    const cfg = TILE_LAYERS[DEFAULT_TILES];
+    const layer = L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom,
+      subdomains: cfg.subdomains,
+    });
+    let errors = 0;
+    layer.on('tileerror', ()=>{ errors++; if (errors > 3) setTilesFailed(true); });
+    layer.addTo(map);
+
+    // Marker cluster group — collapses overlapping markers
+    const cluster = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 45,
+      spiderfyOnMaxZoom: true,
+      disableClusteringAtZoom: 15,
+      iconCreateFunction: (c) => {
+        const count = c.getChildCount();
+        const size = count < 10 ? 36 : count < 100 ? 42 : 48;
+        return L.divIcon({
+          html: `<div style="
+            width:${size}px;height:${size}px;border-radius:50%;
+            background:linear-gradient(135deg,#6366f1,#8b5cf6);
+            color:#fff;display:flex;align-items:center;justify-content:center;
+            font-weight:800;font-size:13px;font-family:inherit;
+            border:3px solid #fff;box-shadow:0 6px 16px rgba(99,102,241,.45);
+          ">${count}</div>`,
+          className: '',
+          iconSize: [size, size],
+        });
+      },
+    });
+    map.addLayer(cluster);
+    clusterRef.current = cluster;
+    mapRef.current = map;
+
+    return () => { map.remove(); mapRef.current = null; clusterRef.current = null; };
+  }, []);
+
+  // Update markers + user position + radius circle
+  useEffect(()=>{
+    const map = mapRef.current;
+    const cluster = clusterRef.current;
+    if (!map || !cluster) return;
+
+    // Clear previous
+    cluster.clearLayers();
+    Object.values(markersRef.current).forEach(m => cluster.removeLayer(m));
+    markersRef.current = {};
+    if (userMarkerRef.current) { map.removeLayer(userMarkerRef.current); userMarkerRef.current = null; }
+    if (radiusCircleRef.current) { map.removeLayer(radiusCircleRef.current); radiusCircleRef.current = null; }
+
+    // --- User pulse + radius circle ---
+    if (userLoc && isFinite(userLoc.lat) && isFinite(userLoc.lng)){
+      const userIcon = L.divIcon({
+        className: '',
+        iconSize: [26,26],
+        iconAnchor: [13,13],
+        html: `<div style="position:relative;width:26px;height:26px">
+          <div style="position:absolute;inset:0;border-radius:50%;background:#6366f1;opacity:.35;animation:pulseRing 2s ease-out infinite"></div>
+          <div style="position:absolute;inset:5px;border-radius:50%;background:#6366f1;border:3px solid #fff;box-shadow:0 2px 10px rgba(99,102,241,.6)"></div>
+        </div>`,
+      });
+      const userMarker = L.marker([userLoc.lat, userLoc.lng], { icon:userIcon, zIndexOffset:1000 })
+        .addTo(map)
+        .bindPopup(`<b>${t('youAreHere')}</b><br/><span style="font-family:monospace;font-size:10px;color:#64748b">${userLoc.lat.toFixed(4)}, ${userLoc.lng.toFixed(4)}</span>`);
+      userMarkerRef.current = userMarker;
+
+      // Radius circle
+      const rKm = radiusKm && isFinite(radiusKm) ? radiusKm : 15;
+      const circle = L.circle([userLoc.lat, userLoc.lng], {
+        radius: rKm * 1000,
+        color: '#6366f1',
+        weight: 1.5,
+        opacity: 0.35,
+        fillColor: '#6366f1',
+        fillOpacity: 0.05,
+        dashArray: '6 8',
+        interactive: false,
+      }).addTo(map);
+      radiusCircleRef.current = circle;
+    }
+
+    // --- Activity markers (inside cluster group) ---
+    const validActivities = activities.filter(a =>
+      a && typeof a.lat === 'number' && typeof a.lng === 'number' &&
+      isFinite(a.lat) && isFinite(a.lng) &&
+      a.lat > -90 && a.lat < 90 && a.lng > -180 && a.lng < 180
+    );
+
+    validActivities.forEach(a=>{
+      const color = CATEGORY_COLORS[a.category] || '#6366f1';
+      const isOpenNow = a.open_status && a.open_status.isOpen === true;
+      const isDemo = !!a.is_demo;
+      const ring = isOpenNow
+        ? 'box-shadow:0 0 0 3px rgba(16,185,129,.55), 0 6px 14px rgba(15,23,42,.28);'
+        : 'box-shadow:0 6px 14px rgba(15,23,42,.28);';
+      const demoStyle = isDemo ? 'border-style:dashed; border-width:3px;' : '';
+      const icon = L.divIcon({
+        className: '',
+        iconSize: [34,34],
+        iconAnchor: [17,34],
+        html: `<div class="mpin" style="background:${color};${ring}${demoStyle}"><span>${isDemo?'?':'•'}</span></div>`,
+      });
+      const dist = userLoc ? haversine(userLoc.lat, userLoc.lng, a.lat, a.lng) : a.distance_km;
+      const popup = `
+        <div style="min-width:180px;font-family:inherit">
+          ${isDemo ? '<div style="font-size:10px;font-weight:800;color:#c2410c;margin-bottom:4px;letter-spacing:.06em">DEMO</div>' : ''}
+          <div style="font-weight:800;font-size:14px;margin-bottom:4px;color:#0f172a">${a.name.replace(/</g,'&lt;')}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:2px">${a.area} · ${fmtDist(dist)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;font-family:monospace">${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</div>
+          <button onclick="window.__openActivity('${a.id}')" style="width:100%;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">${t('viewDetailsBtn')}</button>
+        </div>`;
+      const marker = L.marker([a.lat, a.lng], { icon }).bindPopup(popup, { closeButton:true, maxWidth:260 });
+      cluster.addLayer(marker);
+      markersRef.current[a.id] = marker;
+    });
+
+    // --- Fit bounds: prefer user-relative view ---
+    if (userLoc && isFinite(userLoc.lat) && isFinite(userLoc.lng)){
+      // When user has location, always center there. If activities fit in a sane span, include them.
+      if (validActivities.length > 0){
+        const pts = [[userLoc.lat, userLoc.lng], ...validActivities.map(a => [a.lat, a.lng])];
+        const bounds = L.latLngBounds(pts);
+        const latSpan = bounds.getNorth() - bounds.getSouth();
+        const lngSpan = bounds.getEast() - bounds.getWest();
+        // Only fitBounds when activities are within a tight (local) cluster
+        if (latSpan < 0.35 && lngSpan < 0.35){
+          map.fitBounds(bounds.pad(0.12), { maxZoom: 13 });
+        } else {
+          // Too spread out — just zoom to user, centered
+          map.setView([userLoc.lat, userLoc.lng], 12);
+        }
+      } else {
+        map.setView([userLoc.lat, userLoc.lng], 12);
+      }
+    } else if (validActivities.length > 0){
+      const bounds = L.latLngBounds(validActivities.map(a => [a.lat, a.lng]));
+      map.fitBounds(bounds.pad(0.15), { maxZoom: 13 });
+    }
+  }, [activities, userLoc, t, radiusKm]);
+
+  // Pan to selected activity
+  useEffect(()=>{
+    const map = mapRef.current;
+    if (!map || !selectedId) return;
+    const marker = markersRef.current[selectedId];
+    if (marker){
+      const ll = marker.getLatLng();
+      map.setView(ll, Math.max(map.getZoom(), 15));
+      setTimeout(() => marker.openPopup(), 260);
+    }
+  }, [selectedId]);
+
+  const openRef = useRef(null);
+  openRef.current = { activities, onOpen };
+  useEffect(()=>{
+    window.__openActivity = (id) => {
+      const cur = openRef.current; if (!cur) return;
+      const a = cur.activities.find(x=>x.id===id);
+      if (a) cur.onOpen(a);
+    };
+    return () => { delete window.__openActivity; };
+  }, []);
+
+  return (
+    <div className="relative w-full h-full map-wrap">
+      <div ref={ref} className="w-full h-full"/>
+      {tilesFailed && (
+        <div className="absolute top-3 left-3 right-3 bg-white/95 backdrop-blur rounded-xl px-3 py-2 text-xs font-bold text-amber-700 shadow-lg flex items-center gap-2">
+          <Ic.Alert className="w-4 h-4 shrink-0"/><span className="truncate">{t('mapTilesFailed')}</span>
+        </div>
+      )}
+      {userLoc && (
+        <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] font-bold text-slate-600 shadow flex items-center gap-1.5">
+          <span style={{width:8,height:8,borderRadius:'50%',background:'#6366f1',display:'inline-block'}}/>
+          {t('searchRadius')}: {radiusKm && isFinite(radiusKm) ? `${radiusKm} km` : '15 km'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailMiniMap({ lat, lng, userLoc, color }){
+  const ref = useRef(null);
+  const mapRef = useRef(null);
+  useEffect(()=>{
+    if (!ref.current) return;
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    const map = L.map(ref.current, { zoomControl:false, attributionControl:true, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, minZoom:9, maxZoom:18 }).setView([lat,lng], 14);
+    mapRef.current = map;
+    const cfg = TILE_LAYERS[DEFAULT_TILES];
+    L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom,
+      subdomains: cfg.subdomains,
+    }).addTo(map);
+    const icon = L.divIcon({ className:'', iconSize:[30,30], iconAnchor:[15,30], html:`<div class="mpin" style="background:${color}"><span>•</span></div>` });
+    L.marker([lat,lng], { icon }).addTo(map);
+    if (userLoc){
+      const u = L.divIcon({ className:'', iconSize:[18,18], iconAnchor:[9,9], html:`<div style="width:18px;height:18px;border-radius:50%;background:#6366f1;border:3px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,.3)"></div>` });
+      L.marker([userLoc.lat, userLoc.lng], { icon:u }).addTo(map);
+      const pts = [[lat,lng],[userLoc.lat,userLoc.lng]];
+      const bounds = L.latLngBounds(pts);
+      const latSpan = bounds.getNorth() - bounds.getSouth();
+      const lngSpan = bounds.getEast() - bounds.getWest();
+      if (latSpan < 5 && lngSpan < 5){
+        map.fitBounds(bounds, { padding:[40,40], maxZoom: 15 });
+      }
+    }
+    return ()=>{ if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+  }, [lat,lng,userLoc,color]);
+  return <div ref={ref} className="w-full h-56 rounded-2xl overflow-hidden"/>;
+}
+
+function ActivityDetail({ activity, userLoc, saved, onToggleSave, onClose, lang, t }){
+  const [showSources, setShowSources] = useState(false);
+  if (!activity) return null;
+  const color = CATEGORY_COLORS[activity.category] || '#6366f1';
+  const Ico = CAT_ICONS[activity.category] || Ic.Tag;
+  const dist = userLoc ? haversine(userLoc.lat, userLoc.lng, activity.lat, activity.lng) : activity.distance_km;
+  const verified = activity.verification === 'verified';
+  const official = activity.verification === 'official';
+  const cta = primaryCta(activity, t, userLoc);
+  const CtaIcon = cta.icon;
+  const isOpenNow = activity.open_status && activity.open_status.isOpen === true;
+  const isDemo = !!activity.is_demo;
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-white overflow-y-auto si">
+      <div className="relative aspect-[16/11] sm:aspect-[21/9]" style={{background:`linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`}}>
+        <div className="absolute inset-0 opacity-15 flex items-center justify-center"><Ico className="w-56 h-56 text-white" strokeWidth={0.8}/></div>
+        <div className="absolute top-0 inset-x-0 p-4 flex items-center justify-between">
+          <button onClick={onClose} className="p-2.5 rounded-full bg-white/90 backdrop-blur shadow-lg active:scale-90" aria-label="Back"><Ic.ChevL className="w-5 h-5"/></button>
+          <div className="flex gap-2">
+            <button onClick={()=>onToggleSave(activity.id)} className="p-2.5 rounded-full bg-white/90 backdrop-blur shadow-lg active:scale-90" aria-label={t('saveAria')}>
+              <Ic.Bookmark filled={saved} className={`w-5 h-5 ${saved?'text-indigo-600 pop':''}`}/>
+            </button>
+            <button onClick={()=>{ if(navigator.share){ navigator.share({ title:activity.name, url:activity.source_url }).catch(()=>{}); } else { navigator.clipboard?.writeText(activity.source_url); } }}
+              className="p-2.5 rounded-full bg-white/90 backdrop-blur shadow-lg active:scale-90" aria-label="Share">
+              <Ic.Share className="w-5 h-5"/>
+            </button>
+          </div>
+        </div>
+        <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider text-white bg-black/30 backdrop-blur-sm">
+            <Ico className="w-3.5 h-3.5"/>{catLabel(lang, activity.category)}
+          </span>
+          {isOpenNow && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider text-white bg-emerald-600/80 backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white live-dot"/>
+              {t('openNowShort')}
+            </span>
+          )}
+          {isDemo && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider text-white bg-orange-600/90 backdrop-blur-sm">
+              <Ic.Beaker className="w-3.5 h-3.5"/>
+              DEMO
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="max-w-3xl mx-auto px-5 pb-40 -mt-6 relative">
+        <div className="bg-white rounded-3xl p-5 card-s">
+          <h1 className="text-2xl font-extrabold tracking-tight leading-tight">{activity.name}</h1>
+          {activity.organizer && activity.organizer !== activity.name && <p className="text-sm text-slate-500 mt-1">{t('operatedBy')} {activity.organizer}</p>}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {isDemo ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                <Ic.Beaker className="w-3.5 h-3.5"/>
+                {t('demoSource')}
+              </div>
+            ) : (
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold ${verified?'bg-emerald-50 text-emerald-700':official?'bg-blue-50 text-blue-700':'bg-amber-50 text-amber-700'}`}>
+                {verified ? <Ic.Shield className="w-3.5 h-3.5"/> : official ? <Ic.Check className="w-3.5 h-3.5"/> : <Ic.Alert className="w-3.5 h-3.5"/>}
+                {verified ? t('verified') : official ? t('official') : t('limited')}
+              </div>
+            )}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
+              <Ic.Clock className="w-3.5 h-3.5"/>
+              {isDemo ? t('demoSource') : `${t('fetched')} ${agoLabel(activity.last_checked)}`}
+            </div>
+          </div>
+        </div>
+
+        {activity.offers && activity.offers.length > 0 && (
+          <div className="bg-white rounded-3xl p-5 mt-3 card-s">
+            <div className="flex items-center gap-2 mb-3">
+              <Ic.Sparkles className="w-4 h-4 text-indigo-600"/>
+              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('offersTitle')}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {activity.offers.map(o => (
+                <span key={o} className="inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-bold"
+                  style={{background: color + '15', color}}>
+                  {o}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <div className="bg-white rounded-2xl p-4 card-s">
+            <div className="flex items-center gap-2 mb-2"><Ic.Pin className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('where')}</span></div>
+            <p className="font-bold text-sm break-words">{activity.address}</p>
+            <p className="text-sm text-slate-600 mt-0.5">{activity.area} · {fmtDist(dist)}</p>
+            <p className="text-[10px] text-slate-400 font-mono mt-1">{activity.lat.toFixed(5)}, {activity.lng.toFixed(5)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-4 card-s">
+            <div className="flex items-center gap-2 mb-2"><Ic.Clock className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('whenYouCanGo')}</span></div>
+            {activity.opening_hours ? (
+              <>
+                <div className="mb-2"><OpenStatusBadge activity={activity} size="lg"/></div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">{t('venueHoursNote')}</p>
+              </>
+            ) : <p className="text-sm text-slate-500">{t('notListedInSource')}</p>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-4 mt-3 card-s">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <div className="flex items-center gap-2"><Ic.Map className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('location')}</span></div>
+            <div className="flex items-center gap-3">
+              <a href={osmDirectionsUrl(activity.lat, activity.lng, userLoc?userLoc.lat:null, userLoc?userLoc.lng:null)}
+                target="_blank" rel="noopener noreferrer"
+                className="text-[11px] font-bold text-slate-500 hover:text-emerald-600 hover:underline flex items-center gap-1">
+                <Ic.Osm className="w-3 h-3"/> {t('openInOsm')}
+              </a>
+              <a href={googleMapsDirectionsUrl(activity.lat, activity.lng, userLoc?userLoc.lat:null, userLoc?userLoc.lng:null)}
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1">
+                <Ic.GoogleMaps className="w-3 h-3"/> {t('openInGoogleMaps')} <Ic.Arrow className="w-3 h-3"/>
+              </a>
+            </div>
+          </div>
+          <DetailMiniMap lat={activity.lat} lng={activity.lng} userLoc={userLoc} color={color}/>
+        </div>
+        <div className="bg-white rounded-3xl p-5 mt-3 card-s">
+          <div className="flex items-center gap-2 mb-3"><Ic.Info className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('about')}</span></div>
+          <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line break-words">{activity.description}</p>
+        </div>
+        <div className="bg-white rounded-3xl p-5 mt-3 card-s">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2"><Ic.Shield className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('sourceVerification')}</span></div>
+            <button onClick={()=>setShowSources(!showSources)} className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+              {t('details')} <Ic.ChevD className={`w-3 h-3 transition-transform ${showSources?'rotate-180':''}`}/>
+            </button>
+          </div>
+          <p className="font-bold text-sm mt-3">{activity.source_name}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{t('sourceIsCommunity')}</p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {activity.checks.map(c=>(
+              <span key={c} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                <Ic.Check className="w-3 h-3"/>{c}
+              </span>
+            ))}
+          </div>
+          {showSources && (
+            <div className="mt-4 pt-4 border-t border-slate-100 fi space-y-2">
+              <a href={activity.source_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition">
+                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0"><Ic.Globe className="w-4 h-4 text-slate-500"/></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold truncate">{t('viewOnOsm')}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">{activity.source_url}</p>
+                </div>
+                <Ic.ChevR className="w-4 h-4 text-slate-400 shrink-0"/>
+              </a>
+            </div>
+          )}
+        </div>
+        {(activity.website || activity.phone || activity.email) && (
+          <div className="bg-white rounded-3xl p-5 mt-3 card-s">
+            <div className="flex items-center gap-2 mb-3"><Ic.Link className="w-4 h-4 text-indigo-600"/><span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">{t('contact')}</span></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activity.website && (
+                <a href={activity.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 min-w-0">
+                  <Ic.Globe className="w-4 h-4 text-indigo-600 shrink-0"/><span className="text-sm font-bold truncate">{t('website')}</span><Ic.Arrow className="w-4 h-4 ml-auto text-slate-400 shrink-0"/>
+                </a>
+              )}
+              {activity.phone && (
+                <a href={`tel:${activity.phone.replace(/\s+/g,'')}`} className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 min-w-0">
+                  <Ic.Phone className="w-4 h-4 text-indigo-600 shrink-0"/><span className="text-sm font-bold truncate">{activity.phone}</span>
+                </a>
+              )}
+              {activity.email && (
+                <a href={`mailto:${activity.email}`} className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 min-w-0">
+                  <Ic.Link className="w-4 h-4 text-indigo-600 shrink-0"/><span className="text-sm font-bold truncate">{activity.email}</span>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="fixed bottom-0 inset-x-0 p-4 bg-gradient-to-t from-white via-white to-white/0 pt-8 pointer-events-none">
+        <div className="max-w-3xl mx-auto pointer-events-auto">
+          <a href={cta.href} target="_blank" rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl grad text-white font-extrabold shadow-xl shadow-indigo-500/25 active:scale-[.98]">
+            <CtaIcon className="w-5 h-5 shrink-0"/><span className="truncate">{cta.label}</span>
+          </a>
+          <p className="text-center text-[10px] text-slate-500 mt-2">{t('neverBooks')}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SavedView({ activities, savedIds, onOpen, onToggleSave, userLoc, lang, t }){
+  const saved = activities.filter(a=> savedIds.includes(a.id));
+  if (!saved.length) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5"><Ic.Bookmark className="w-9 h-9 text-slate-400"/></div>
+      <h3 className="text-xl font-extrabold tracking-tight mb-1.5">{t('noSaved')}</h3>
+      <p className="text-sm text-slate-500 max-w-xs">{t('noSavedDesc')}</p>
+    </div>
+  );
+  return (
+    <div className="min-w-0">
+      <h2 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider mb-3">{t('savedCount')} ({saved.length})</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {saved.map((a,i)=><ActivityCard key={a.id} activity={a} userLoc={userLoc} saved onToggleSave={onToggleSave} onOpen={onOpen} index={i} lang={lang} t={t}/>)}
+      </div>
+    </div>
+  );
+}
+
+function ProfileView({ location, onOpenLocation, savedIds, recentIds, preferences, setPreferences, onOpenLang, lang, t }){
+  return (
+    <div className="max-w-2xl mx-auto min-w-0">
+      <div className="bg-white rounded-3xl p-6 card-s mb-5">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl grad flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0"><Ic.User className="w-8 h-8 text-white"/></div>
+          <div className="min-w-0"><h1 className="text-xl font-extrabold tracking-tight">{t('yourProfile')}</h1><p className="text-sm text-slate-500 mt-0.5">{t('noAccount')}</p></div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <button onClick={onOpenLocation} className="bg-white rounded-2xl p-4 card-s text-left hover:card-s-h transition min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center mb-2"><Ic.Pin className="w-4 h-4 text-indigo-600"/></div>
+          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{t('myLocation')}</p>
+          <p className="text-sm font-bold mt-0.5 truncate">{location.label}</p>
+        </button>
+        <div className="bg-white rounded-2xl p-4 card-s min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center mb-2"><Ic.Bookmark className="w-4 h-4 text-indigo-600"/></div>
+          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{t('savedCount')}</p>
+          <p className="text-sm font-bold mt-0.5">{savedIds.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 card-s min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center mb-2"><Ic.Clock className="w-4 h-4 text-indigo-600"/></div>
+          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{t('viewed')}</p>
+          <p className="text-sm font-bold mt-0.5">{recentIds.length}</p>
+        </div>
+      </div>
+      <div className="bg-white rounded-3xl p-5 card-s mb-5">
+        <h2 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider mb-3">{t('preferences')}</h2>
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold text-slate-700 mb-2">{t('defaultRadius')}</p>
+            <div className="flex flex-wrap gap-2">
+              {[0.5,1,2,5,10,25].map(d=>(
+                <button key={d} onClick={()=>setPreferences({...preferences, maxDistance: preferences.maxDistance===d?null:d})}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition ${preferences.maxDistance===d?'chip-on':'bg-white border-slate-200 text-slate-600'}`}>
+                  {d<1?`${d*1000} m`:`${d} km`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-3xl p-5 card-s mb-5">
+        <h2 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider mb-3">{t('settings')}</h2>
+        <div className="space-y-1">
+          {[
+            {icon:Ic.Language, label:t('language'), sub: lang==='ar'?'العربية':'English', action: onOpenLang},
+            {icon:Ic.Pin, label:t('myLocation'), sub: location.label, action: onOpenLocation},
+            {icon:Ic.Bell, label:t('notifications'), sub:t('notificationsSub'), action: ()=>{}},
+            {icon:Ic.Shield, label:t('privacy'), sub:t('privacySub'), action: ()=>{}},
+          ].map((row,i)=>{
+            const Icon = row.icon;
+            return (
+              <button key={i} onClick={row.action} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition text-left min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-slate-600"/></div>
+                <div className="min-w-0 flex-1"><p className="text-sm font-bold truncate">{row.label}</p><p className="text-xs text-slate-500 truncate">{row.sub}</p></div>
+                <Ic.ChevR className="w-4 h-4 text-slate-400 shrink-0"/>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard({ activities, onClose, t }){
+  const stats = useMemo(()=>{
+    const total = activities.length;
+    const live = activities.filter(a=>!a.is_demo).length;
+    const demo = activities.filter(a=>a.is_demo).length;
+    const openNowCount = activities.filter(a=>a.open_status && a.open_status.isOpen === true).length;
+    return { total, live, demo, openNowCount };
+  }, [activities]);
+  const Stat = ({ label, value, sub, icon:Icn, tint }) => (
+    <div className="bg-white rounded-2xl p-4 card-s min-w-0">
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${tint}`}><Icn className="w-4 h-4"/></div>
+      <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider truncate">{label}</p>
+      <p className="text-2xl font-extrabold tracking-tight mt-1">{value}</p>
+      {sub && <p className="text-xs text-slate-500 mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-[95] bg-slate-50 overflow-y-auto fi">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6 gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2 truncate"><Ic.Chart className="w-6 h-6 text-indigo-600 shrink-0"/> {t('dashboard')}</h1>
+            <p className="text-sm text-slate-500 mt-1 truncate">{t('dashboardSub')}</p>
+          </div>
+          <button onClick={onClose} className="p-2.5 rounded-full bg-white card-s hover:bg-slate-50 shrink-0"><Ic.X className="w-5 h-5"/></button>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <Stat label={t('totalVenues')} value={stats.total} icon={Ic.Database} tint="bg-indigo-50 text-indigo-600"/>
+          <Stat label="Live" value={stats.live} sub="From OpenStreetMap" icon={Ic.Globe} tint="bg-emerald-50 text-emerald-600"/>
+          <Stat label={t('demoCount')} value={stats.demo} sub="Sample data" icon={Ic.Beaker} tint="bg-orange-50 text-orange-600"/>
+          <Stat label="Open now" value={stats.openNowCount} icon={Ic.Pulse} tint="bg-blue-50 text-blue-600"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SortMenu({ value, onChange, t }){
+  const [open, setOpen] = useState(false);
+  const opts = [['nearest', t('sortNearest')],['score', t('sortScore')],['alpha', t('sortAlpha')]];
+  const current = opts.find(o=>o[0]===value) || opts[0];
+  return (
+    <div className="relative shrink-0">
+      <button onClick={()=>setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold hover:border-slate-300">
+        <Ic.Sliders className="w-3.5 h-3.5 text-slate-500"/>
+        <span className="hidden sm:inline">{t('sort')}: </span>{current[1]}
+        <Ic.ChevD className={`w-3 h-3 transition-transform ${open?'rotate-180':''}`}/>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={()=>setOpen(false)}/>
+          <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl card-s shadow-xl border border-slate-100 py-1.5 z-20 fi si">
+            {opts.map(([id,label])=>(
+              <button key={id} onClick={()=>{ onChange(id); setOpen(false); }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold hover:bg-slate-50 transition ${value===id?'text-indigo-600':''}`}>
+                {label}{value===id && <Ic.Check className="w-3.5 h-3.5"/>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BottomNav({ tab, setTab, savedCount, t }){
+  const items = [
+    {id:'home', label:t('home'), icon:Ic.Home},
+    {id:'map', label:t('map'), icon:Ic.Map},
+    {id:'saved', label:t('saved'), icon:Ic.Bookmark, badge:savedCount},
+    {id:'profile', label:t('profile'), icon:Ic.User},
+  ];
+  return (
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-100">
+      <div className="max-w-lg mx-auto grid grid-cols-4">
+        {items.map(it=>{
+          const Icon = it.icon; const active = tab === it.id;
+          return (
+            <button key={it.id} onClick={()=>setTab(it.id)} className="relative flex flex-col items-center justify-center gap-0.5 py-2.5 active:scale-95">
+              <div className={`relative p-1.5 rounded-xl transition ${active?'bg-indigo-50':''}`}>
+                <Icon className={`w-5 h-5 ${active?'text-indigo-600':'text-slate-400'}`}/>
+                {it.badge > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full grad text-white text-[9px] font-extrabold flex items-center justify-center">
+                    {it.badge > 9 ? '9+' : it.badge}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] font-bold ${active?'text-indigo-600':'text-slate-500'}`}>{it.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function LocationPicker({ open, onClose, onSelect, current, t, firstTime }){
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [results, setResults] = useState([]);
+  const ref = useRef();
+  useEffect(()=>{ if(open){ setQ(''); setErr(''); setResults([]); setTimeout(()=>ref.current?.focus(),150); } }, [open]);
+  if (!open) return null;
+  const useMyLocation = () => {
+    setErr('');
+    if (!navigator.geolocation){ setErr(t('geoUnsupported')); return; }
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      const { latitude, longitude } = pos.coords;
+      const geo = await reverseGeocode(latitude, longitude);
+      setBusy(false);
+      onSelect({ lat:latitude, lng:longitude, label: geo.label, area: geo.area, source:'gps' });
+    }, (e)=>{ setBusy(false); setErr(e.code===1 ? t('geoDenied') : t('geoFail')); },
+      { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  };
+  const doSearch = async () => {
+    if (!q.trim()) return;
+    setBusy(true); setErr(''); setResults([]);
+    try{
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`);
+      const j = await r.json();
+      if (j && j.length) setResults(j); else setErr(t('noMatches'));
+    } catch { setErr(t('searchFail')); }
+    setBusy(false);
+  };
+  return (
+    <div className="fixed inset-0 z-[80] backdrop fi" onClick={firstTime ? null : onClose}>
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4" onClick={e=>e.stopPropagation()}>
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden si max-h-[85vh] flex flex-col">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="text-lg font-extrabold tracking-tight">{firstTime ? t('pickLocationTitle') : t('changeLocation')}</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{firstTime ? t('pickLocationSub') : t('changeLocationSub')}</p>
+            </div>
+            {!firstTime && (
+              <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100"><Ic.X className="w-5 h-5"/></button>
+            )}
+          </div>
+          <div className="p-5 space-y-3 overflow-y-auto">
+            <button onClick={useMyLocation} disabled={busy}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 hover:bg-indigo-50 active:scale-[.99] transition text-left disabled:opacity-60">
+              <div className="w-10 h-10 rounded-xl grad flex items-center justify-center shrink-0">
+                {busy ? <Ic.Refresh className="w-5 h-5 text-white animate-spin"/> : <Ic.Crosshair className="w-5 h-5 text-white"/>}
+              </div>
+              <div>
+                <div className="font-bold text-sm">{t('useMyLoc')}</div>
+                <div className="text-xs text-slate-500">{t('useMyLocSub')}</div>
+              </div>
+            </button>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">{t('orSearchPlace')}</label>
+              <div className="mt-2 flex gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Ic.Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+                  <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()}
+                    placeholder="Seeb, Muscat · Dubai · London"
+                    className="w-full pl-10 pr-3 py-3 rounded-xl bg-slate-100 border-2 border-transparent focus:border-indigo-400 focus:bg-white outline-none text-sm font-medium"/>
+                </div>
+                <button onClick={doSearch} disabled={busy||!q.trim()}
+                  className="px-4 rounded-xl grad text-white font-bold text-sm disabled:opacity-40 active:scale-95 shrink-0">{t('search')}</button>
+              </div>
+              {err && <div className="mt-2 text-xs text-red-600 flex items-center gap-1.5"><Ic.Alert className="w-3.5 h-3.5"/>{err}</div>}
+            </div>
+            {results.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">{t('searchResults')}</div>
+                {results.map((r,i)=>(
+                  <button key={i} onClick={async ()=>{
+                    const lat = parseFloat(r.lat), lng = parseFloat(r.lon);
+                    const geo = await reverseGeocode(lat, lng);
+                    onSelect({ lat, lng, label: r.display_name.split(',').slice(0,3).join(',').trim(), area: geo.area, source:'search' });
+                  }}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 text-left border border-transparent">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><Ic.Pin className="w-4 h-4 text-slate-500"/></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm truncate">{r.display_name.split(',')[0]}</div>
+                      <div className="text-xs text-slate-500 truncate">{r.display_name}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">{t('presets')}</div>
+              <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1">
+                {PRESET_LOCATIONS.map(l=>{
+                  const active = current.label === l.label;
+                  return (
+                    <button key={l.label} onClick={()=>onSelect({ ...l, source:'preset' })}
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition ${active?'bg-indigo-50 border border-indigo-200':'hover:bg-slate-50 border border-transparent'}`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${active?'grad':'bg-slate-100'}`}>
+                        <Ic.Pin className={`w-4 h-4 ${active?'text-white':'text-slate-500'}`}/>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-sm truncate">{l.label}</div>
+                        <div className="text-xs text-slate-500 truncate">{l.lat.toFixed(3)}, {l.lng.toFixed(3)}</div>
+                      </div>
+                      {active && <Ic.Check className="w-4 h-4 text-indigo-600"/>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MAIN APP
+   ============================================================ */
+function App(){
+  const [lang, setLang] = useLS('af_lang', 'en');
+  const [location, setLocation] = useLS('af_location', null);
+  const [savedIds, setSavedIds] = useLS('af_saved', []);
+  const [recentIds, setRecentIds] = useLS('af_recent', []);
+  const [preferences, setPreferences] = useLS('af_prefs', { maxDistance:null });
+
+  const [query, setQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
+  const [category, setCategory] = useState('All');
+  const [filters, setFilters] = useState({ distance:null, openNow:false, hasContact:false });
+  const [sort, setSort] = useState('nearest');
+  const [tab, setTab] = useState('home');
+  const [view, setView] = useState('list');
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [firstTimePicker, setFirstTimePicker] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [geoState, setGeoState] = useState('idle');
+  const [geoApproximate, setGeoApproximate] = useState(false);
+
+  const [mode, setMode] = useState('demo');
+  const [liveActivities, setLiveActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const t = useMemo(()=> makeT(lang), [lang]);
+
+  useEffect(()=>{
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang==='ar' ? 'rtl' : 'ltr';
+    document.body.dir = lang==='ar' ? 'rtl' : 'ltr';
+  }, [lang]);
+
+  useEffect(()=>{
+    if (location) return;
+    if (!navigator.geolocation){
+      setGeoState('failed');
+      setFirstTimePicker(true);
+      setShowPicker(true);
+      return;
+    }
+    setGeoState('locating');
+    navigator.geolocation.getCurrentPosition(
+      async (pos)=>{
+        const { latitude, longitude, accuracy } = pos.coords;
+        const trust = isGeoTrustworthy(latitude, longitude, accuracy);
+        const geo = await reverseGeocode(latitude, longitude);
+        setLocation({ lat:latitude, lng:longitude, label: geo.label, area: geo.area, source:'gps' });
+        setGeoState('found');
+        if (!trust.ok){
+          setGeoApproximate(true);
+        }
+      },
+      (err)=>{
+        setGeoState(err.code === 1 ? 'denied' : 'failed');
+        setFirstTimePicker(true);
+        setShowPicker(true);
+      },
+      { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+    );
+  }, []);
+
+  const effectiveRadius = useMemo(()=>{
+    if (filters.distance != null) return filters.distance;
+    if (preferences.maxDistance != null) return preferences.maxDistance;
+    return 25;
+  }, [filters.distance, preferences.maxDistance]);
+
+  const runLiveFetch = useCallback(async (loc, radiusKm, catId)=>{
+    setLoading(true); setRetrying(false);
+    try{
+      const { elements } = await fetchOverpass(loc.lat, loc.lng, radiusKm, catId, (i)=>{
+        if (i > 0) setRetrying(true);
+      });
+      const live = elementsToActivities(elements, loc, loc.area, t);
+      setLiveActivities(live);
+      return live;
+    } catch(e){
+      console.warn('Live fetch failed:', e.message);
+      setLiveActivities([]);
+      return [];
+    } finally {
+      setLoading(false); setRetrying(false);
+    }
+  }, [t]);
+
+  const toggleLive = async () => {
+    if (!location) { setFirstTimePicker(true); setShowPicker(true); return; }
+    if (mode === 'demo'){
+      setMode('live');
+      await runLiveFetch(location, effectiveRadius, category);
+    } else {
+      setMode('demo');
+      setLiveActivities([]);
+    }
+  };
+
+  useEffect(()=>{
+    if (mode !== 'live' || !location) return;
+    runLiveFetch(location, effectiveRadius, category);
+  }, [mode, location?.lat, location?.lng, effectiveRadius, category, runLiveFetch]);
+
+  const activities = useMemo(()=>{
+    if (!location) return [];
+    let base;
+    if (mode === 'live' && liveActivities.length > 0) base = liveActivities;
+    else base = getDemoActivities(location, category);
+    return base.map(a => ({ ...a, area: areaFromCoords(a.lat, a.lng, a.area) }));
+  }, [mode, liveActivities, location, category]);
+
+  const showingDemo = useMemo(()=>{
+    if (mode === 'demo') return true;
+    if (mode === 'live' && liveActivities.length === 0 && !loading) return true;
+    return false;
+  }, [mode, liveActivities, loading]);
+
+  const toggleSave = useCallback((id)=>{
+    setSavedIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+  }, [setSavedIds]);
+
+  const openDetail = useCallback((a)=>{
+    setDetail(a);
+    setSelectedId(a.id);
+    setRecentIds(prev => [a.id, ...prev.filter(x=>x!==a.id)].slice(0, 20));
+  }, [setRecentIds]);
+
+  const filtered = useMemo(()=>{
+    if (!location) return [];
+    const parsed = parseQuery(activeQuery);
+    const maxDistance = filters.distance != null ? filters.distance : (preferences.maxDistance || 50);
+    return activities.filter(a=>{
+      const dist = haversine(location.lat, location.lng, a.lat, a.lng);
+      if (dist > maxDistance) return false;
+      if (filters.openNow && a.open_status.isOpen !== true) return false;
+      if (filters.hasContact && !(a.website || a.phone || a.email)) return false;
+      if (parsed.text){
+        const hay = (a.name+' '+a.description+' '+a.organizer+' '+a.area+' '+a.category+' '+a.subcategory+' '+(a.offers||[]).join(' ')).toLowerCase();
+        if (!hay.includes(parsed.text.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [activities, location, filters, activeQuery, preferences]);
+
+  const sorted = useMemo(()=>{
+    if (!location) return [];
+    const list = [...filtered];
+    switch(sort){
+      case 'score': return list.sort((a,b)=> (b.score||0) - (a.score||0) || a.distance_km - b.distance_km);
+      case 'alpha': return list.sort((a,b)=> a.name.localeCompare(b.name));
+      default:
+        return list.sort((a,b)=> haversine(location.lat, location.lng, a.lat, a.lng) - haversine(location.lat, location.lng, b.lat, b.lng));
+    }
+  }, [filtered, sort, location]);
+
+  const submitSearch = (q) => {
+    const val = (typeof q === 'string' ? q : query).trim();
+    setActiveQuery(val);
+    const parsed = parseQuery(val);
+    if (parsed.category) setCategory(parsed.category);
+    setTab('home'); setView('list');
+  };
+  const clearAllFilters = () => {
+    setFilters({ distance:null, openNow:false, hasContact:false });
+    setCategory('All'); setQuery(''); setActiveQuery('');
+  };
+  const broadenSearch = () => setFilters(f => ({ ...f, distance: 50 }));
+  const refreshNow = async () => {
+    if (mode === 'live' && location) await runLiveFetch(location, effectiveRadius, category);
+  };
+
+  const activeFilterCount = useMemo(()=>{
+    let c = 0;
+    if (filters.distance != null) c++;
+    if (filters.openNow) c++;
+    if (filters.hasContact) c++;
+    if (category && category !== 'All') c++;
+    return c;
+  }, [filters, category]);
+
+  const openNowCount = useMemo(()=> sorted.filter(a => a.open_status && a.open_status.isOpen === true).length, [sorted]);
+
+  const distanceLabel = effectiveRadius < 1 ? `${effectiveRadius*1000} m` : `${effectiveRadius} km`;
+  const venuesWord = sorted.length === 1 ? t('venuesFoundSing') : t('venuesFound', { n: sorted.length });
+
+  const displayLocation = location || { label:'—', lat:0, lng:0 };
+
+  return (
+    <div className="min-h-screen pb-20 lg:pb-0 w-full max-w-full overflow-x-clip">
+      <Header location={displayLocation} onOpenLocation={()=>setShowPicker(true)}
+        lang={lang} onOpenLang={()=>setLang(lang==='en'?'ar':'en')}
+        onOpenAdmin={()=>setShowAdmin(true)} onRefresh={refreshNow} loading={loading} t={t} geoState={geoState}
+        isLive={mode === 'live'} onToggleLive={toggleLive}/>
+
+      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-6 w-full min-w-0">
+        {!location ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-20 h-20 rounded-3xl grad flex items-center justify-center mb-5 shadow-lg shadow-indigo-500/25">
+              <Ic.Crosshair className="w-9 h-9 text-white"/>
+            </div>
+            <h2 className="text-xl font-extrabold tracking-tight mb-2">{t('pickLocationTitle')}</h2>
+            <p className="text-sm text-slate-500 max-w-md mb-6">{t('pickLocationSub')}</p>
+            <button onClick={()=>{ setFirstTimePicker(true); setShowPicker(true); }}
+              className="px-6 py-3 rounded-2xl grad text-white font-extrabold active:scale-95 shadow-lg shadow-indigo-500/25">
+              {t('changeLocation')}
+            </button>
+          </div>
+        ) : tab === 'home' ? (
+          <div className="lg:grid lg:grid-cols-[280px_minmax(0,1fr)_380px] lg:gap-5 w-full min-w-0">
+            <aside className="hidden lg:block min-w-0">
+              <div className="sticky top-24 bg-white rounded-3xl card-s overflow-hidden h-[calc(100vh-7rem)]">
+                <FiltersPanel filters={filters} setFilters={setFilters} onClose={()=>{}} resultsCount={sorted.length} t={t}/>
+              </div>
+            </aside>
+
+            <section className="min-w-0 w-full">
+              <div className="mb-4 w-full"><SearchBar value={query} onChange={setQuery} onSubmit={submitSearch} t={t}/></div>
+              <div className="mb-3 w-full"><CategoryRow selected={category} onSelect={setCategory} lang={lang} activities={activities} t={t}/></div>
+              <div className="mb-3 w-full"><QuickChips filters={filters} setFilters={setFilters} onOpenFilters={()=>setShowFilters(true)} t={t}/></div>
+
+              <div className="flex items-center justify-between gap-3 mb-4 mt-2 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-extrabold tracking-tight truncate">
+                    {activeQuery ? `${t('resultsFor')} "${activeQuery}"` : t('venuesNear')}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    {location.label} · {distanceLabel}
+                    {openNowCount > 0 && ` · ${openNowCount} open now`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={()=>setShowFilters(true)}
+                    className="lg:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold relative shrink-0">
+                    <Ic.Filter className="w-3.5 h-3.5"/><span className="hidden sm:inline">{t('filters')}</span>
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full grad text-white text-[10px] font-extrabold flex items-center justify-center">{activeFilterCount}</span>
+                    )}
+                  </button>
+                  <SortMenu value={sort} onChange={setSort} t={t}/>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mb-3 min-w-0">
+                <p className="text-xs font-bold text-slate-500 truncate">
+                  {loading ? (retrying ? t('retryingMsg') : t('scanningMsg')) : venuesWord}
+                </p>
+                <div className="lg:hidden flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
+                  <button onClick={()=>setView('list')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center transition ${view==='list'?'bg-slate-100':''}`}><Ic.List className="w-3.5 h-3.5"/></button>
+                  <button onClick={()=>setView('map')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center transition ${view==='map'?'bg-slate-100':''}`}><Ic.Map className="w-3.5 h-3.5"/></button>
+                </div>
+              </div>
+
+              {geoApproximate && (
+                <GeoWarningBanner location={location} onFix={()=>{ setFirstTimePicker(false); setShowPicker(true); }} t={t}/>
+              )}
+
+              {showingDemo && !loading && !geoApproximate && (
+                <div className="col-span-full mb-3 bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 flex items-center gap-2 text-xs font-bold text-orange-800">
+                  <Ic.Beaker className="w-4 h-4 shrink-0"/>
+                  <span>{t('demoMode')} · Click "Try live data" in the header to fetch real venues.</span>
+                </div>
+              )}
+
+              {view === 'map' ? (
+                <div className="lg:hidden h-[calc(100vh-19rem)] rounded-3xl overflow-hidden card-s mb-4 relative">
+                  <MapView activities={sorted} userLoc={location} onOpen={openDetail} selectedId={selectedId} t={t} radiusKm={effectiveRadius}/>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full min-w-0">
+                  {loading && sorted.length === 0 ? (
+                    Array.from({length:4}).map((_,i)=><SkeletonCard key={i}/>)
+                  ) : sorted.length === 0 ? (
+                    <EmptyState onBroaden={broadenSearch} onClear={clearAllFilters} reason={activities.length > 0 ? 'narrow' : 'empty'} t={t}/>
+                  ) : (
+                    sorted.map((a,i)=>(
+                      <ActivityCard key={a.id} activity={a} userLoc={location}
+                        saved={savedIds.includes(a.id)} onToggleSave={toggleSave} onOpen={openDetail} index={i} lang={lang} t={t}/>
+                    ))
+                  )}
+                </div>
+              )}
+            </section>
+
+            <aside className="hidden lg:block min-w-0">
+              <div className="sticky top-24 h-[calc(100vh-7rem)] rounded-3xl overflow-hidden card-s relative">
+                <MapView activities={sorted} userLoc={location} onOpen={openDetail} selectedId={selectedId} t={t} radiusKm={effectiveRadius}/>
+              </div>
+            </aside>
+          </div>
+        ) : tab === 'map' ? (
+          <div className="lg:hidden w-full min-w-0">
+            <div className="mb-3"><SearchBar value={query} onChange={setQuery} onSubmit={submitSearch} t={t}/></div>
+            <div className="mb-3"><CategoryRow selected={category} onSelect={setCategory} lang={lang} activities={activities} t={t}/></div>
+            <div className="h-[calc(100vh-16rem)] rounded-3xl overflow-hidden card-s relative">
+              <MapView activities={sorted} userLoc={location} onOpen={openDetail} selectedId={selectedId} t={t} radiusKm={effectiveRadius}/>
+            </div>
+            <p className="text-center text-xs text-slate-500 mt-3">{venuesWord}</p>
+          </div>
+        ) : tab === 'saved' ? (
+          <SavedView activities={activities} savedIds={savedIds} onOpen={openDetail} onToggleSave={toggleSave} userLoc={location} lang={lang} t={t}/>
+        ) : (
+          <ProfileView location={location} onOpenLocation={()=>{ setFirstTimePicker(false); setShowPicker(true); }}
+            savedIds={savedIds} recentIds={recentIds} preferences={preferences}
+            setPreferences={setPreferences} onOpenLang={()=>setLang(lang==='en'?'ar':'en')} lang={lang} t={t}/>
+        )}
+      </main>
+
+      <BottomNav tab={tab} setTab={setTab} savedCount={savedIds.length} t={t}/>
+
+      {showFilters && (
+        <div className="fixed inset-0 z-[75] lg:hidden backdrop fi" onClick={()=>setShowFilters(false)}>
+          <div className="absolute inset-x-0 bottom-0 top-6 bg-white rounded-t-3xl overflow-hidden su flex flex-col max-w-lg mx-auto" onClick={e=>e.stopPropagation()}>
+            <FiltersPanel filters={filters} setFilters={setFilters} onClose={()=>setShowFilters(false)} resultsCount={sorted.length} t={t}/>
+          </div>
+        </div>
+      )}
+
+      <LocationPicker open={showPicker} onClose={()=>{ setShowPicker(false); setFirstTimePicker(false); }}
+        current={location || { label:'', lat:0, lng:0 }}
+        onSelect={(loc)=>{ setLocation(loc); setShowPicker(false); setFirstTimePicker(false); setGeoApproximate(false); }}
+        firstTime={firstTimePicker} t={t}/>
+
+      {detail && (
+        <ActivityDetail activity={detail} userLoc={location} saved={savedIds.includes(detail.id)}
+          onToggleSave={toggleSave} onClose={()=>setDetail(null)} lang={lang} t={t}/>
+      )}
+
+      {showAdmin && <AdminDashboard activities={activities} onClose={()=>setShowAdmin(false)} t={t}/>}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+</body>
+</html>
